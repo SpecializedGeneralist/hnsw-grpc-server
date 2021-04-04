@@ -1,0 +1,101 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package grpcapi;
+
+option go_package = "github.com/SpecializedGeneralist/hnswg-grpc-service/pkg/grpcapi";
+
+service Server {
+  // CreateIndex makes a new index.
+  rpc CreateIndex(CreateIndexRequest) returns (google.protobuf.Empty) {}
+  // DeleteIndex removes an index.
+  rpc DeleteIndex(DeleteIndexRequest) returns (google.protobuf.Empty) {}
+  // InsertVector inserts a new vector in the given index.
+  rpc InsertVector(InsertVectorRequest) returns (InsertVectorReply) {}
+  // InsertVectors inserts the new vectors in the given index. It flushes the index at each batch.
+  rpc InsertVectors(stream InsertVectorRequest) returns (InsertVectorsReply) {}
+  // SearchKNN returns the top k nearest neighbors to the query, searching on the given index.
+  rpc SearchKNN(SearchRequest) returns (SearchKNNReply) {}
+  // FlushIndex the index to file.
+  rpc FlushIndex(FlushRequest) returns (google.protobuf.Empty) {}
+  // Indices returns the list of indices.
+  rpc Indices(google.protobuf.Empty) returns (IndicesReply) {}
+  // SetEf sets the `ef` parameter for the given index.
+  rpc SetEf(SetEfRequest) returns (google.protobuf.Empty) {}
+}
+
+message CreateIndexRequest {
+  // SpaceType is the vector space.
+  enum SpaceType {
+    L2 = 0;
+    IP = 1;
+    COSINE = 2;
+  }
+
+  string index_name = 1;
+  int32 dim = 2;
+  int32 efConstruction = 3;
+  int32 m = 4;
+  int32 max_elements = 5;
+  int32 seed = 6;
+  SpaceType space_type = 7;
+}
+
+message InsertVectorRequest {
+  string index_name = 1;
+  Vector vector = 2;
+}
+
+message SearchRequest {
+  string index_name = 1;
+  Vector vector = 2;
+  int32 k = 3;
+}
+
+message Vector {
+  repeated float value = 1;
+}
+
+message DeleteIndexRequest {
+  string index_name = 1;
+}
+
+message IndicesReply {
+  repeated string indices = 1;
+}
+
+message FlushRequest {
+  string index_name = 1;
+}
+
+message InsertVectorReply {
+  string id = 1;
+
+  // Took is the number of milliseconds it took the server to execute the request.
+  int64 took = 2;
+}
+
+message InsertVectorsReply {
+  repeated string ids = 1;
+
+  // Took is the number of milliseconds it took the server to execute the request.
+  int64 took = 2;
+}
+
+// Hit represents a the result of a search
+message SearchKNNReply {
+  repeated Hit hits = 1;
+
+  // Took is the number of milliseconds it took the server to execute the request.
+  int64 took = 2;
+}
+
+// Hit represents a single result
+message Hit {
+  string id = 1; // the id of the stored vector
+  float distance = 2; // the distance between the stored vector and the query vector
+}
+
+message SetEfRequest {
+  string index_name = 1;
+  int32 value = 2;
+}
