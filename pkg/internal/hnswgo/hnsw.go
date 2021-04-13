@@ -12,6 +12,7 @@ package hnswgo
 // void setEf(HNSW index, int ef);
 import "C"
 import (
+	"fmt"
 	"math"
 	"sync/atomic"
 	"unsafe"
@@ -22,13 +23,15 @@ type HNSW struct {
 	SpaceType string
 	Dim       int
 	LastID    uint32
+	AutoID    bool
 }
 
-func New(dim, M, efConstruction, randSeed int, maxElements uint32, spaceType string) *HNSW {
+func New(dim, M, efConstruction, randSeed int, maxElements uint32, spaceType string, autoID bool) *HNSW {
 	var hnsw HNSW
 	hnsw.LastID = 0
 	hnsw.Dim = dim
 	hnsw.SpaceType = spaceType
+	hnsw.AutoID = autoID
 	switch spaceType {
 	case "ip", "cosine":
 		hnsw.index = C.initHNSW(
@@ -52,12 +55,13 @@ func New(dim, M, efConstruction, randSeed int, maxElements uint32, spaceType str
 	return &hnsw
 }
 
-func Load(location string, dim int, spaceType string) *HNSW {
+func Load(location string, dim int, spaceType string, autoID string) *HNSW {
 	var hnsw HNSW
 	hnsw.Dim = dim
 	hnsw.SpaceType = spaceType
 	hnsw.LastID = 0
 	pLocation := C.CString(location)
+	hnsw.AutoID = autoID == "true"
 	switch spaceType {
 	case "ip", "cosine":
 		hnsw.index = C.loadHNSW(pLocation, C.int(dim), C.char('i'))
@@ -86,20 +90,27 @@ func normalizeVector(vector []float32) []float32 {
 	return vector
 }
 
-func (h *HNSW) AddPointAutoID(vector []float32) uint32 {
+func (h *HNSW) AddPointAutoID(vector []float32) (uint32, error) {
+	if !h.AutoID {
+		return 0, fmt.Errorf("invalid call with auto-id disabled")
+	}
 	id := atomic.AddUint32(&h.LastID, 1)
 	if h.SpaceType == "cosine" {
 		vector = normalizeVector(vector)
 	}
 	C.addPoint(h.index, (*C.float)(unsafe.Pointer(&vector[0])), C.ulong(id))
-	return id
+	return id, nil
 }
 
-func (h *HNSW) AddPoint(vector []float32, label uint32) {
+func (h *HNSW) AddPoint(vector []float32, label uint32) error {
+	if h.AutoID {
+		return fmt.Errorf("invalid call with auto-id enabled")
+	}
 	if h.SpaceType == "cosine" {
 		vector = normalizeVector(vector)
 	}
 	C.addPoint(h.index, (*C.float)(unsafe.Pointer(&vector[0])), C.ulong(label))
+	return nil
 }
 
 func (h *HNSW) MarkDelete(label uint32) {

@@ -55,8 +55,9 @@ func Load(dataPath string) (Indices, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid filename %s", fname)
 		}
+		autoID := spl[4]
 
-		h := hnswgo.Load(path.Join(dataPath, fname), dim, spaceType)
+		h := hnswgo.Load(path.Join(dataPath, fname), dim, spaceType, autoID)
 		h.LastID = uint32(lastID)
 		indices[indexName] = h
 	}

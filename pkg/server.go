@@ -83,6 +83,7 @@ func (s *Server) CreateIndex(_ context.Context, request *grpcapi.CreateIndexRequ
 		int(request.Seed),
 		uint32(request.MaxElements),
 		spaceType,
+		request.AutoId,
 	)
 	s.indices[indexName] = h
 
@@ -134,10 +135,36 @@ func (s *Server) InsertVector(_ context.Context, request *grpcapi.InsertVectorRe
 		return nil, fmt.Errorf("index [%s] doesn't exists", indexName)
 	}
 
-	id := index.AddPointAutoID(request.Vector.Value)
+	id, err := index.AddPointAutoID(request.Vector.Value)
+	if err != nil {
+		return nil, err
+	}
 
 	return &grpcapi.InsertVectorReply{
 		Id:   fmt.Sprintf("%d", id),
+		Took: time.Since(start).Milliseconds(),
+	}, nil
+}
+
+// InsertVectorWithId inserts a new vector in the given index.
+func (s *Server) InsertVectorWithId(_ context.Context, request *grpcapi.InsertVectorWithIdRequest) (*grpcapi.InsertVectorWithIdReply, error) {
+	log.Debug().Msg("Received request for vector inserting.")
+	start := time.Now()
+	indexName := request.IndexName
+	if !isValidIndexName(indexName) {
+		return nil, fmt.Errorf("invalid index name [%s]", indexName)
+	}
+	index, exists := s.indices[indexName]
+	if !exists {
+		return nil, fmt.Errorf("index [%s] doesn't exists", indexName)
+	}
+
+	err := index.AddPoint(request.Vector.Value, uint32(request.Id))
+	if err != nil {
+		return nil, err
+	}
+
+	return &grpcapi.InsertVectorWithIdReply{
 		Took: time.Since(start).Milliseconds(),
 	}, nil
 }
@@ -181,8 +208,56 @@ func (s *Server) InsertVectors(stream grpcapi.Server_InsertVectorsServer) error 
 				indexName, curIndexName)
 		}
 
-		newID := index.AddPointAutoID(request.Vector.Value)
+		newID, err := index.AddPointAutoID(request.Vector.Value)
+		if err != nil {
+			return err
+		}
+
 		ids = append(ids, fmt.Sprintf("%d", newID))
+	}
+}
+
+// InsertVectorsWithIds inserts the new vectors in the given index. It flushes the index at each batch.
+func (s *Server) InsertVectorsWithIds(stream grpcapi.Server_InsertVectorsWithIdsServer) error {
+	log.Debug().Msg("Received request for vectors inserting.")
+	start := time.Now()
+	var index *hnswgo.HNSW
+	var indexName string
+	for {
+		request, err := stream.Recv()
+		if err == io.EOF {
+			if index != nil {
+				_ = s.removeIndexFromStorage(indexName) // important
+				index.Save(path.Join(s.dataPath, makeIndexFilename(index, indexName)))
+			}
+			return stream.SendAndClose(&grpcapi.InsertVectorsWithIdsReply{
+				Took: time.Since(start).Milliseconds(),
+			})
+		}
+		if err != nil {
+			return err
+		}
+		curIndexName := request.IndexName
+		if !isValidIndexName(curIndexName) {
+			return fmt.Errorf("invalid index name [%s]", curIndexName)
+		}
+		curIndex, exists := s.indices[curIndexName]
+		if !exists {
+			return fmt.Errorf("index [%s] doesn't exists", curIndexName)
+		}
+		if indexName == "" {
+			index = curIndex
+			indexName = curIndexName
+		}
+		if indexName != curIndexName {
+			return fmt.Errorf("the index must be constant during a batch insertion; expected [%s] found [%s]",
+				indexName, curIndexName)
+		}
+
+		err = index.AddPoint(request.Vector.Value, uint32(request.Id))
+		if err != nil {
+			return err
+		}
 	}
 }
 
@@ -215,7 +290,7 @@ func (s *Server) SearchKNN(_ context.Context, request *grpcapi.SearchRequest) (*
 	}, nil
 }
 
-// Flush the index to file.
+// FlushIndex flushes the index to file.
 func (s *Server) FlushIndex(_ context.Context, request *grpcapi.FlushRequest) (*emptypb.Empty, error) {
 	log.Debug().Msg("Received request for index flushing.")
 	indexName := request.IndexName
@@ -233,11 +308,13 @@ func (s *Server) FlushIndex(_ context.Context, request *grpcapi.FlushRequest) (*
 }
 
 func makeIndexFilename(index *hnswgo.HNSW, indexName string) string {
-	return fmt.Sprintf("%s_%s_%d_%d",
+	return fmt.Sprintf("%s_%s_%d_%d_%t",
 		indexName,
 		index.SpaceType,
 		index.Dim,
-		index.LastID)
+		index.LastID,
+		index.AutoID,
+	)
 }
 
 // Indices returns the list of indices.

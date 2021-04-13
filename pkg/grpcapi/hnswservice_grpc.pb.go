@@ -26,9 +26,13 @@ type ServerClient interface {
 	InsertVector(ctx context.Context, in *InsertVectorRequest, opts ...grpc.CallOption) (*InsertVectorReply, error)
 	// InsertVectors inserts the new vectors in the given index. It flushes the index at each batch.
 	InsertVectors(ctx context.Context, opts ...grpc.CallOption) (Server_InsertVectorsClient, error)
+	// InsertVectorWithID inserts a new vector in the given index.
+	InsertVectorWithId(ctx context.Context, in *InsertVectorWithIdRequest, opts ...grpc.CallOption) (*InsertVectorWithIdReply, error)
+	// InsertVectorsWithIDs inserts the new vectors in the given index. It flushes the index at each batch.
+	InsertVectorsWithIds(ctx context.Context, opts ...grpc.CallOption) (Server_InsertVectorsWithIdsClient, error)
 	// SearchKNN returns the top k nearest neighbors to the query, searching on the given index.
 	SearchKNN(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchKNNReply, error)
-	// Flush the index to file.
+	// FlushIndex the index to file.
 	FlushIndex(ctx context.Context, in *FlushRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Indices returns the list of indices.
 	Indices(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IndicesReply, error)
@@ -105,6 +109,49 @@ func (x *serverInsertVectorsClient) CloseAndRecv() (*InsertVectorsReply, error) 
 	return m, nil
 }
 
+func (c *serverClient) InsertVectorWithId(ctx context.Context, in *InsertVectorWithIdRequest, opts ...grpc.CallOption) (*InsertVectorWithIdReply, error) {
+	out := new(InsertVectorWithIdReply)
+	err := c.cc.Invoke(ctx, "/grpcapi.Server/InsertVectorWithId", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverClient) InsertVectorsWithIds(ctx context.Context, opts ...grpc.CallOption) (Server_InsertVectorsWithIdsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Server_serviceDesc.Streams[1], "/grpcapi.Server/InsertVectorsWithIds", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &serverInsertVectorsWithIdsClient{stream}
+	return x, nil
+}
+
+type Server_InsertVectorsWithIdsClient interface {
+	Send(*InsertVectorWithIdRequest) error
+	CloseAndRecv() (*InsertVectorsWithIdsReply, error)
+	grpc.ClientStream
+}
+
+type serverInsertVectorsWithIdsClient struct {
+	grpc.ClientStream
+}
+
+func (x *serverInsertVectorsWithIdsClient) Send(m *InsertVectorWithIdRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *serverInsertVectorsWithIdsClient) CloseAndRecv() (*InsertVectorsWithIdsReply, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(InsertVectorsWithIdsReply)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *serverClient) SearchKNN(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchKNNReply, error) {
 	out := new(SearchKNNReply)
 	err := c.cc.Invoke(ctx, "/grpcapi.Server/SearchKNN", in, out, opts...)
@@ -153,9 +200,13 @@ type ServerServer interface {
 	InsertVector(context.Context, *InsertVectorRequest) (*InsertVectorReply, error)
 	// InsertVectors inserts the new vectors in the given index. It flushes the index at each batch.
 	InsertVectors(Server_InsertVectorsServer) error
+	// InsertVectorWithID inserts a new vector in the given index.
+	InsertVectorWithId(context.Context, *InsertVectorWithIdRequest) (*InsertVectorWithIdReply, error)
+	// InsertVectorsWithIDs inserts the new vectors in the given index. It flushes the index at each batch.
+	InsertVectorsWithIds(Server_InsertVectorsWithIdsServer) error
 	// SearchKNN returns the top k nearest neighbors to the query, searching on the given index.
 	SearchKNN(context.Context, *SearchRequest) (*SearchKNNReply, error)
-	// Flush the index to file.
+	// FlushIndex the index to file.
 	FlushIndex(context.Context, *FlushRequest) (*emptypb.Empty, error)
 	// Indices returns the list of indices.
 	Indices(context.Context, *emptypb.Empty) (*IndicesReply, error)
@@ -179,6 +230,12 @@ func (UnimplementedServerServer) InsertVector(context.Context, *InsertVectorRequ
 }
 func (UnimplementedServerServer) InsertVectors(Server_InsertVectorsServer) error {
 	return status.Errorf(codes.Unimplemented, "method InsertVectors not implemented")
+}
+func (UnimplementedServerServer) InsertVectorWithId(context.Context, *InsertVectorWithIdRequest) (*InsertVectorWithIdReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InsertVectorWithId not implemented")
+}
+func (UnimplementedServerServer) InsertVectorsWithIds(Server_InsertVectorsWithIdsServer) error {
+	return status.Errorf(codes.Unimplemented, "method InsertVectorsWithIds not implemented")
 }
 func (UnimplementedServerServer) SearchKNN(context.Context, *SearchRequest) (*SearchKNNReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchKNN not implemented")
@@ -285,6 +342,50 @@ func (x *serverInsertVectorsServer) Recv() (*InsertVectorRequest, error) {
 	return m, nil
 }
 
+func _Server_InsertVectorWithId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InsertVectorWithIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerServer).InsertVectorWithId(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/grpcapi.Server/InsertVectorWithId",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServer).InsertVectorWithId(ctx, req.(*InsertVectorWithIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Server_InsertVectorsWithIds_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ServerServer).InsertVectorsWithIds(&serverInsertVectorsWithIdsServer{stream})
+}
+
+type Server_InsertVectorsWithIdsServer interface {
+	SendAndClose(*InsertVectorsWithIdsReply) error
+	Recv() (*InsertVectorWithIdRequest, error)
+	grpc.ServerStream
+}
+
+type serverInsertVectorsWithIdsServer struct {
+	grpc.ServerStream
+}
+
+func (x *serverInsertVectorsWithIdsServer) SendAndClose(m *InsertVectorsWithIdsReply) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *serverInsertVectorsWithIdsServer) Recv() (*InsertVectorWithIdRequest, error) {
+	m := new(InsertVectorWithIdRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func _Server_SearchKNN_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SearchRequest)
 	if err := dec(in); err != nil {
@@ -374,6 +475,10 @@ var _Server_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Server_InsertVector_Handler,
 		},
 		{
+			MethodName: "InsertVectorWithId",
+			Handler:    _Server_InsertVectorWithId_Handler,
+		},
+		{
 			MethodName: "SearchKNN",
 			Handler:    _Server_SearchKNN_Handler,
 		},
@@ -394,6 +499,11 @@ var _Server_serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "InsertVectors",
 			Handler:       _Server_InsertVectors_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "InsertVectorsWithIds",
+			Handler:       _Server_InsertVectorsWithIds_Handler,
 			ClientStreams: true,
 		},
 	},
