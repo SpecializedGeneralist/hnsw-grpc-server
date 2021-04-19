@@ -11,133 +11,377 @@ package hnswgo
 // int searchKnn(HNSW index, float *vec, int N, unsigned long int *label, float *dist);
 // void setEf(HNSW index, int ef);
 import "C"
+
 import (
+	"encoding/gob"
 	"fmt"
 	"math"
+	"os"
+	"path"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
 
+// Config provides configuration parameters for HNSW.
+type Config struct {
+	SpaceType      SpaceType
+	Dim            int
+	MaxElements    int
+	M              int
+	EfConstruction int
+	RandSeed       int
+	AutoIDEnabled  bool
+}
+
+// SpaceType identifies a space type to be used by HNSW algorithm.
+type SpaceType string
+
+// HNSW is an interface to HNSW C code.
 type HNSW struct {
-	index     C.HNSW
-	SpaceType string
-	Dim       int
-	LastID    uint32
-	AutoID    bool
+	index C.HNSW
+	state hnswState
+	// Most operations lock the mutex for reading, including AddPoint and
+	// AddPointAutoID, since the actual locking of critical parts is
+	// already implemented in the native C++ code.
+	// The only operation which locks for writing is Save.
+	rwMx sync.RWMutex
 }
 
-func New(dim, M, efConstruction, randSeed int, maxElements uint32, spaceType string, autoID bool) *HNSW {
-	var hnsw HNSW
-	hnsw.LastID = 0
-	hnsw.Dim = dim
-	hnsw.SpaceType = spaceType
-	hnsw.AutoID = autoID
-	switch spaceType {
-	case "ip", "cosine":
-		hnsw.index = C.initHNSW(
-			C.int(dim),
-			C.ulong(maxElements),
-			C.int(M),
-			C.int(efConstruction),
-			C.int(randSeed),
-			C.char('i'),
-		)
+const (
+	// IPSpace identifies an Inner Product space.
+	IPSpace SpaceType = "ip"
+	// CosineSpace identifies a Cosine space.
+	CosineSpace SpaceType = "cosine"
+	// L2Space identifies an L2 space.
+	L2Space SpaceType = "l2"
+)
+
+// SpaceTypeFromString makes a SpaceType value from string.
+// Valid string values are: "ip", "cosine", or "l2".
+func SpaceTypeFromString(s string) (SpaceType, error) {
+	switch s {
+	case "ip":
+		return IPSpace, nil
+	case "cosine":
+		return CosineSpace, nil
+	case "l2":
+		return L2Space, nil
 	default:
-		hnsw.index = C.initHNSW(
-			C.int(dim),
-			C.ulong(maxElements),
-			C.int(M),
-			C.int(efConstruction),
-			C.int(randSeed),
-			C.char('l'),
-		)
+		return IPSpace, fmt.Errorf("invalid space type %#v", s)
 	}
-	return &hnsw
 }
 
-func Load(location string, dim int, spaceType string, autoID string) *HNSW {
-	var hnsw HNSW
-	hnsw.Dim = dim
-	hnsw.SpaceType = spaceType
-	hnsw.LastID = 0
-	pLocation := C.CString(location)
-	hnsw.AutoID = autoID == "true"
-	switch spaceType {
-	case "ip", "cosine":
-		hnsw.index = C.loadHNSW(pLocation, C.int(dim), C.char('i'))
+func (st SpaceType) cChar() C.char {
+	switch st {
+	case IPSpace, CosineSpace:
+		return C.char('i')
+	case L2Space:
+		return C.char('l')
 	default:
-		hnsw.index = C.loadHNSW(pLocation, C.int(dim), C.char('l'))
+		panic(fmt.Sprintf("unexpected SpaceType %#v", st))
 	}
-	C.free(unsafe.Pointer(pLocation))
-	return &hnsw
 }
 
-func (h *HNSW) Save(location string) {
-	pLocation := C.CString(location)
-	C.saveHNSW(h.index, pLocation)
-	C.free(unsafe.Pointer(pLocation))
+// New creates a new HNSW index.
+func New(config Config) *HNSW {
+	return &HNSW{
+		index: C.initHNSW(
+			C.int(config.Dim),
+			C.ulong(config.MaxElements),
+			C.int(config.M),
+			C.int(config.EfConstruction),
+			C.int(config.RandSeed),
+			config.SpaceType.cChar(),
+		),
+		state: hnswState{
+			Dim:           config.Dim,
+			SpaceType:     config.SpaceType,
+			AutoIDEnabled: config.AutoIDEnabled,
+			LastAutoID:    0,
+		},
+		rwMx: sync.RWMutex{},
+	}
+}
+
+// Load loads an HNSW index from file.
+func Load(location string) (*HNSW, error) {
+	state, err := loadState(location)
+	if err != nil {
+		return nil, err
+	}
+
+	index, err := loadIndex(location, state.Dim, state.SpaceType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &HNSW{
+		index: index,
+		state: *state,
+		rwMx:  sync.RWMutex{},
+	}, nil
+}
+
+func loadState(dir string) (_ *hnswState, err error) {
+	tmpFilename := path.Join(dir, "state.tmp")
+	tmpExists, err := fileExists(tmpFilename)
+	if err != nil {
+		return nil, err
+	}
+	if tmpExists {
+		return nil, fmt.Errorf("cannot load HNSW state file: %#v found", tmpFilename)
+	}
+
+	filename := path.Join(dir, "state")
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file %#v: %w", filename, err)
+	}
+	defer func() {
+		if e := file.Close(); e != nil && err == nil {
+			err = fmt.Errorf("error closing file %#v: %w", filename, e)
+		}
+	}()
+	decoder := gob.NewDecoder(file)
+	state := new(hnswState)
+	err = decoder.Decode(state)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding HNSW state: %w", err)
+	}
+	return state, nil
+}
+
+func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
+	tmpFilename := path.Join(dir, "index.tmp")
+	tmpExists, err := fileExists(tmpFilename)
+	if err != nil {
+		return nil, err
+	}
+	if tmpExists {
+		return nil, fmt.Errorf("cannot load HNSW index file: %#v found", tmpFilename)
+	}
+
+	filename := path.Join(dir, "index")
+	fExists, err := fileExists(filename)
+	if err != nil {
+		return nil, err
+	}
+	if !fExists {
+		return nil, fmt.Errorf("cannot load HNSW index file %#v: file not found", filename)
+	}
+
+	pFilename := C.CString(filename)
+	defer C.free(unsafe.Pointer(pFilename))
+	index := C.loadHNSW(
+		pFilename,
+		C.int(dim),
+		spaceType.cChar(),
+	)
+	return index, nil
+}
+
+// Save saves the HNSW index to file.
+func (h *HNSW) Save(location string) error {
+	h.rwMx.Lock()
+	defer h.rwMx.Unlock()
+
+	err := ensureDirExists(location)
+	if err != nil {
+		return err
+	}
+
+	// Create new temporary files: if something goes wrong, the old
+	// files (if any) will not be corrupted.
+	err = h.saveState(path.Join(location, "state.tmp"))
+	if err != nil {
+		return err
+	}
+	h.saveIndex(path.Join(location, "index.tmp"))
+
+	// Now that the temporary files are successfully created, replace
+	// the old files (if any) with the new ones.
+	err = os.Rename(path.Join(location, "state.tmp"), path.Join(location, "state"))
+	if err != nil {
+		return err
+	}
+	err = os.Rename(path.Join(location, "index.tmp"), path.Join(location, "index"))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *HNSW) saveState(name string) (err error) {
+	file, err := os.Create(name)
+	if err != nil {
+		return fmt.Errorf("error creating file %#v: %w", name, err)
+	}
+	defer func() {
+		if e := file.Close(); e != nil && err == nil {
+			err = fmt.Errorf("error closing file %#v: %w", name, e)
+		}
+	}()
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(h.state)
+	if err != nil {
+		return fmt.Errorf("error encoding HNSW state: %w", err)
+	}
+	return nil
+}
+
+func (h *HNSW) saveIndex(name string) {
+	pName := C.CString(name)
+	defer C.free(unsafe.Pointer(pName))
+	C.saveHNSW(h.index, pName)
+}
+
+// AddPoint adds a new vector to the index.
+func (h *HNSW) AddPoint(vector []float32, id uint32) error {
+	if h.state.AutoIDEnabled {
+		return fmt.Errorf("invalid call to HNSW.AddPoint with auto-ID enabled")
+	}
+	h.addPoint(vector, id)
+	return nil
+}
+
+// AddPointAutoID adds a new vector to the index.
+func (h *HNSW) AddPointAutoID(vector []float32) error {
+	if !h.state.AutoIDEnabled {
+		return fmt.Errorf("invalid call to HNSW.AddPointAutoID with auto-ID disabled")
+	}
+	id := atomic.AddUint32(&h.state.LastAutoID, 1)
+	h.addPoint(vector, id)
+	return nil
+}
+
+func (h *HNSW) addPoint(vector []float32, id uint32) {
+	h.rwMx.RLock()
+	defer h.rwMx.RUnlock()
+
+	if h.state.SpaceType == "cosine" {
+		vector = normalizeVector(vector)
+	}
+	C.addPoint(h.index, (*C.float)(unsafe.Pointer(&vector[0])), C.ulong(id))
+}
+
+// MarkDelete marks an element with the given ID deleted.
+// It does not really change the current graph.
+func (h *HNSW) MarkDelete(id uint32) {
+	h.rwMx.RLock()
+	defer h.rwMx.RUnlock()
+
+	C.markDelete(h.index, C.ulong(id))
+}
+
+// KNNResult is an ID/Distance pair, which is a single result
+// item of HNSW.SearchKNN.
+type KNNResult struct {
+	ID       uint32
+	Distance float32
+}
+
+// SearchKNN performs KNN search.
+func (h *HNSW) SearchKNN(vector []float32, N int) []KNNResult {
+	h.rwMx.RLock()
+	defer h.rwMx.RUnlock()
+
+	if h.state.SpaceType == "cosine" {
+		vector = normalizeVector(vector)
+	}
+
+	cLabels := make([]C.ulong, N, N)
+	cDistances := make([]C.float, N, N)
+	numResults := int(C.searchKnn(
+		h.index,
+		(*C.float)(unsafe.Pointer(&vector[0])),
+		C.int(N),
+		&cLabels[0],
+		&cDistances[0],
+	))
+
+	results := make([]KNNResult, numResults)
+	for i := range results {
+		results[i] = KNNResult{
+			ID:       uint32(cLabels[i]),
+			Distance: float32(cDistances[i]),
+		}
+	}
+	return results
+}
+
+// SetEf sets the "ef" parameter.
+func (h *HNSW) SetEf(ef int) {
+	h.rwMx.RLock()
+	defer h.rwMx.RUnlock()
+
+	C.setEf(h.index, C.int(ef))
+}
+
+// hnswState provides serializable configuration settings and other
+// parameters for the internal state of a HNSW object.
+type hnswState struct {
+	Dim           int
+	SpaceType     SpaceType
+	AutoIDEnabled bool
+	LastAutoID    uint32
 }
 
 func normalizeVector(vector []float32) []float32 {
 	var norm float32
-	for i := 0; i < len(vector); i++ {
-		norm += vector[i] * vector[i]
+	for _, v := range vector {
+		norm += v * v
 	}
 	norm = 1.0 / (float32(math.Sqrt(float64(norm))) + 1e-15)
-	for i := 0; i < len(vector); i++ {
-		vector[i] = vector[i] * norm
+
+	result := make([]float32, len(vector))
+	for i := range result {
+		result[i] = vector[i] * norm
 	}
-	return vector
+	return result
 }
 
-func (h *HNSW) AddPointAutoID(vector []float32) (uint32, error) {
-	if !h.AutoID {
-		return 0, fmt.Errorf("invalid call with auto-id disabled")
+func ensureDirExists(name string) error {
+	exists, err := dirExists(name)
+	if err != nil {
+		return err
 	}
-	id := atomic.AddUint32(&h.LastID, 1)
-	if h.SpaceType == "cosine" {
-		vector = normalizeVector(vector)
+	if exists {
+		return nil
 	}
-	C.addPoint(h.index, (*C.float)(unsafe.Pointer(&vector[0])), C.ulong(id))
-	return id, nil
-}
 
-func (h *HNSW) AddPoint(vector []float32, label uint32) error {
-	if h.AutoID {
-		return fmt.Errorf("invalid call with auto-id enabled")
+	err = os.Mkdir(name, 0777)
+	if err != nil {
+		return fmt.Errorf("error creating dir %#v: %w", name, err)
 	}
-	if h.SpaceType == "cosine" {
-		vector = normalizeVector(vector)
-	}
-	C.addPoint(h.index, (*C.float)(unsafe.Pointer(&vector[0])), C.ulong(label))
 	return nil
 }
 
-func (h *HNSW) MarkDelete(label uint32) {
-	C.markDelete(h.index, C.ulong(label))
+func dirExists(name string) (bool, error) {
+	info, err := os.Stat(name)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("error checking if %#v exists: %w", name, err)
+	}
+	if !info.IsDir() {
+		return false, fmt.Errorf("%#v exists but is not a directory", name)
+	}
+	return true, nil
 }
 
-func (h *HNSW) SearchKNN(vector []float32, N int) ([]uint32, []float32) {
-	Clabel := make([]C.ulong, N, N)
-	Cdist := make([]C.float, N, N)
-	if h.SpaceType == "cosine" {
-		vector = normalizeVector(vector)
+func fileExists(name string) (bool, error) {
+	info, err := os.Stat(name)
+	if os.IsNotExist(err) {
+		return false, nil
 	}
-	numResult := int(C.searchKnn(
-		h.index, (*C.float)(unsafe.Pointer(&vector[0])),
-		C.int(N),
-		&Clabel[0],
-		&Cdist[0]),
-	)
-	labels := make([]uint32, N)
-	dists := make([]float32, N)
-	for i := 0; i < numResult; i++ {
-		labels[i] = uint32(Clabel[i])
-		dists[i] = float32(Cdist[i])
+	if err != nil {
+		return false, fmt.Errorf("error checking if %#v exists: %w", name, err)
 	}
-	return labels[:numResult], dists[:numResult]
-}
-
-func (h *HNSW) SetEf(ef int) {
-	C.setEf(h.index, C.int(ef))
+	if info.IsDir() {
+		return false, fmt.Errorf("%#v exists but is not a file", name)
+	}
+	return true, nil
 }
