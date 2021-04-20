@@ -15,6 +15,7 @@ import "C"
 import (
 	"encoding/gob"
 	"fmt"
+	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/osutils"
 	"math"
 	"os"
 	"path"
@@ -125,7 +126,7 @@ func Load(location string) (*HNSW, error) {
 
 func loadState(dir string) (_ *hnswState, err error) {
 	tmpFilename := path.Join(dir, "state.tmp")
-	tmpExists, err := fileExists(tmpFilename)
+	tmpExists, err := osutils.FileExists(tmpFilename)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +155,7 @@ func loadState(dir string) (_ *hnswState, err error) {
 
 func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
 	tmpFilename := path.Join(dir, "index.tmp")
-	tmpExists, err := fileExists(tmpFilename)
+	tmpExists, err := osutils.FileExists(tmpFilename)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +164,7 @@ func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
 	}
 
 	filename := path.Join(dir, "index")
-	fExists, err := fileExists(filename)
+	fExists, err := osutils.FileExists(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +344,7 @@ func normalizeVector(vector []float32) []float32 {
 }
 
 func ensureDirExists(name string) error {
-	exists, err := dirExists(name)
+	exists, err := osutils.DirExists(name)
 	if err != nil {
 		return err
 	}
@@ -356,32 +357,4 @@ func ensureDirExists(name string) error {
 		return fmt.Errorf("error creating dir %#v: %w", name, err)
 	}
 	return nil
-}
-
-func dirExists(name string) (bool, error) {
-	info, err := os.Stat(name)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("error checking if %#v exists: %w", name, err)
-	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("%#v exists but is not a directory", name)
-	}
-	return true, nil
-}
-
-func fileExists(name string) (bool, error) {
-	info, err := os.Stat(name)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("error checking if %#v exists: %w", name, err)
-	}
-	if info.IsDir() {
-		return false, fmt.Errorf("%#v exists but is not a file", name)
-	}
-	return true, nil
 }
