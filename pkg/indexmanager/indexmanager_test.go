@@ -181,12 +181,12 @@ func TestIndexManager_PersistIndex(t *testing.T) {
 
 			foo, err := im.CreateIndex("foo", sampleConfig)
 			assert.NoError(t, err)
-			err = foo.AddPointAutoID(sampleVectors[0])
+			_, err = foo.AddPointAutoID(sampleVectors[0])
 			assert.NoError(t, err)
 
 			bar, err := im.CreateIndex("bar", sampleConfig)
 			assert.NoError(t, err)
-			err = bar.AddPointAutoID(sampleVectors[1])
+			_, err = bar.AddPointAutoID(sampleVectors[1])
 			assert.NoError(t, err)
 
 			err = im.PersistIndex("foo")
@@ -327,7 +327,7 @@ var sampleVectors = [][]float32{
 func createAndSaveSampleIndex(t *testing.T, dir string) {
 	hnsw := hnswgo.New(sampleConfig)
 	for _, vector := range sampleVectors {
-		err := hnsw.AddPointAutoID(vector)
+		_, err := hnsw.AddPointAutoID(vector)
 		assert.NoError(t, err)
 	}
 	err := hnsw.Save(dir)

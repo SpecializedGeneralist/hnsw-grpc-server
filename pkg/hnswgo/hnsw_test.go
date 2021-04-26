@@ -119,7 +119,7 @@ func TestHNSW_AutoIDDisabled(t *testing.T) {
 	err := hnsw.AddPoint(sampleVectors[0], uint32(42))
 	assert.NoError(t, err)
 
-	err = hnsw.AddPointAutoID(sampleVectors[1])
+	_, err = hnsw.AddPointAutoID(sampleVectors[1])
 	assert.Error(t, err)
 
 	results := hnsw.SearchKNN(sampleVectors[0], 1)
@@ -133,9 +133,10 @@ func TestHNSW_AutoIDEnabled(t *testing.T) {
 
 	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
 
-	for _, vector := range sampleVectors {
-		err := hnsw.AddPointAutoID(vector)
+	for i, vector := range sampleVectors {
+		id, err := hnsw.AddPointAutoID(vector)
 		assert.NoError(t, err)
+		assert.Equal(t, i+1, int(id))
 	}
 
 	err := hnsw.AddPoint(sampleVectors[0], uint32(42))
@@ -278,11 +279,13 @@ func TestHNSW_SavingErrors(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
 func createAndSaveSampleIndex(t *testing.T, dir string) {
 	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
-	for _, vector := range sampleVectors {
-		err := hnsw.AddPointAutoID(vector)
+	for i, vector := range sampleVectors {
+		id, err := hnsw.AddPointAutoID(vector)
 		assert.NoError(t, err)
+		assert.Equal(t, i+1, int(id))
 	}
 	err := hnsw.Save(dir)
 	assert.NoError(t, err)

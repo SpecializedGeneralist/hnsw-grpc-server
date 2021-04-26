@@ -248,13 +248,13 @@ func (h *HNSW) AddPoint(vector []float32, id uint32) error {
 }
 
 // AddPointAutoID adds a new vector to the index.
-func (h *HNSW) AddPointAutoID(vector []float32) error {
+func (h *HNSW) AddPointAutoID(vector []float32) (uint32, error) {
 	if !h.state.AutoIDEnabled {
-		return fmt.Errorf("invalid call to HNSW.AddPointAutoID with auto-ID disabled")
+		return 0, fmt.Errorf("invalid call to HNSW.AddPointAutoID with auto-ID disabled")
 	}
 	id := atomic.AddUint32(&h.state.LastAutoID, 1)
 	h.addPoint(vector, id)
-	return nil
+	return id, nil
 }
 
 func (h *HNSW) addPoint(vector []float32, id uint32) {
