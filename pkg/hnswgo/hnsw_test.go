@@ -15,7 +15,7 @@
 package hnswgo_test
 
 import (
-	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/internal/hnswgo"
+	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/hnswgo"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
