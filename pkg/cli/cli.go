@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cli
 
 import (
-	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/cli"
+	"fmt"
 	"os"
 )
 
-func main() {
-	cli.Run(os.Args)
+// Run runs the CLI application.
+func Run(arguments []string) {
+	app := NewApp()
+	err := app.Run(arguments)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
 }
