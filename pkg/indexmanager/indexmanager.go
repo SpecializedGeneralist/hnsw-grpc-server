@@ -147,6 +147,18 @@ func (im *IndexManager) DeleteIndex(name string) error {
 	return nil
 }
 
+// IndicesNames returns the names of all in-memory indices.
+func (im *IndexManager) IndicesNames() []string {
+	im.rwMx.RLock()
+	defer im.rwMx.RUnlock()
+
+	names := make([]string, 0, len(im.indices))
+	for name := range im.indices {
+		names = append(names, name)
+	}
+	return names
+}
+
 // Size returns the amount of currently loaded indices.
 func (im *IndexManager) Size() int {
 	im.rwMx.RLock()

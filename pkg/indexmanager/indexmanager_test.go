@@ -104,6 +104,11 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 2, im.Size())
 
+		names := im.IndicesNames()
+		assert.Len(t, names, 2)
+		assert.Contains(t, names, "foo")
+		assert.Contains(t, names, "bar")
+
 		index, found := im.GetIndex("foo")
 		assert.NotNil(t, index)
 		assert.True(t, found)
@@ -132,6 +137,11 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 		index, err = im.CreateIndex("bar", sampleConfig)
 		assert.NoError(t, err)
 		assert.NotNil(t, index)
+
+		names := im.IndicesNames()
+		assert.Len(t, names, 2)
+		assert.Contains(t, names, "foo")
+		assert.Contains(t, names, "bar")
 
 		index, found := im.GetIndex("foo")
 		assert.NotNil(t, index)
@@ -201,6 +211,11 @@ func TestIndexManager_PersistIndex(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, 2, im.Size())
 
+			names := im.IndicesNames()
+			assert.Len(t, names, 2)
+			assert.Contains(t, names, "foo")
+			assert.Contains(t, names, "bar")
+
 			index, found := im.GetIndex("foo")
 			assert.NotNil(t, index)
 			assert.True(t, found)
@@ -243,12 +258,18 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 		_, err := im.CreateIndex("bar", sampleConfig)
 		assert.NoError(t, err)
 
+		names := im.IndicesNames()
+		assert.Equal(t, []string{"bar"}, names)
+
 		index, found := im.GetIndex("bar")
 		assert.NotNil(t, index)
 		assert.True(t, found)
 
 		err = im.DeleteIndex("bar")
 		assert.NoError(t, err)
+
+		names = im.IndicesNames()
+		assert.Empty(t, names)
 
 		index, found = im.GetIndex("bar")
 		assert.Nil(t, index)
@@ -271,6 +292,11 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 		err = im.PersistIndex("bar")
 		assert.NoError(t, err)
 
+		names := im.IndicesNames()
+		assert.Len(t, names, 2)
+		assert.Contains(t, names, "foo")
+		assert.Contains(t, names, "bar")
+
 		index, found := im.GetIndex("foo")
 		assert.NotNil(t, index)
 		assert.True(t, found)
@@ -284,6 +310,9 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 
 		err = im.DeleteIndex("foo")
 		assert.NoError(t, err)
+
+		names = im.IndicesNames()
+		assert.Equal(t, []string{"bar"}, names)
 
 		index, found = im.GetIndex("foo")
 		assert.Nil(t, index)
