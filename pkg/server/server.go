@@ -21,7 +21,6 @@ import (
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/hnswgo"
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/indexmanager"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"strings"
@@ -266,7 +265,7 @@ func (s *Server) FlushIndex(_ context.Context, req *grpcapi.FlushRequest) (*empt
 
 // Indices returns the list of indices.
 func (s *Server) Indices(context.Context, *emptypb.Empty) (*grpcapi.IndicesReply, error) {
-	log.Debug().Msg("Received req for getting indices.")
+	s.logger.Debug().Msg("Received req for getting indices.")
 
 	return &grpcapi.IndicesReply{
 		Indices: s.indexManager.IndicesNames(),
@@ -275,7 +274,7 @@ func (s *Server) Indices(context.Context, *emptypb.Empty) (*grpcapi.IndicesReply
 
 // SetEf sets the `ef` parameter for the given index.
 func (s *Server) SetEf(_ context.Context, req *grpcapi.SetEfRequest) (*emptypb.Empty, error) {
-	log.Debug().Msg("Received req for `ef` setting.")
+	s.logger.Debug().Msg("Received req for `ef` setting.")
 
 	index, indexExists := s.indexManager.GetIndex(req.GetIndexName())
 	if !indexExists {
