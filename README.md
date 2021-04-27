@@ -1,6 +1,7 @@
 # hnsw-grpc-server
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/SpecializedGeneralist/hnsw-grpc-server)](https://goreportcard.com/report/github.com/SpecializedGeneralist/hnsw-grpc-server)
+[![Maintainability](https://api.codeclimate.com/v1/badges/7b5c7fd17aada5ad4016/maintainability)](https://codeclimate.com/github/SpecializedGeneralist/hnsw-grpc-server/maintainability)
 
 This is a work-in-progress gRPC server for [hnswlib](https://github.com/nmslib/hnswlib). 
 
