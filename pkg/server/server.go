@@ -27,6 +27,7 @@ import (
 	"time"
 )
 
+// Server is the main implementation of HNSW gRPC server.
 type Server struct {
 	grpcapi.UnimplementedServerServer
 	config       Config
@@ -36,6 +37,7 @@ type Server struct {
 
 var _ grpcapi.ServerServer = &Server{}
 
+// New creates a new Server.
 func New(config Config, indexManager *indexmanager.IndexManager, logger zerolog.Logger) *Server {
 	return &Server{
 		config:       config,
