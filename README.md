@@ -1,5 +1,7 @@
 # hnsw-grpc-server
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/SpecializedGeneralist/hnsw-grpc-server)](https://goreportcard.com/report/github.com/SpecializedGeneralist/hnsw-grpc-server)
+
 This is a work-in-progress gRPC server for [hnswlib](https://github.com/nmslib/hnswlib). 
 
 It is more than just the core HNSW model, it provides a tool that can be used end-to-end, supporting TLS encryption, multiple persistent indices and batch insertions.
