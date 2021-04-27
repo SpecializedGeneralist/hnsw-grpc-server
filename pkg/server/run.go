@@ -21,6 +21,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 	"net"
 	"runtime/debug"
@@ -35,6 +37,7 @@ func (s *Server) Run() error {
 
 	grpcServer := grpc.NewServer(serverOptions...)
 	grpcapi.RegisterServerServer(grpcServer, s)
+	grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
 
 	listener, err := net.Listen("tcp", s.config.Address)
 	if err != nil {
