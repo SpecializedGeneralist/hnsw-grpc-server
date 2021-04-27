@@ -24,3 +24,10 @@ jobs:
         run: go build -ldflags="-extldflags=-static" -o hnsw-grpc-server cmd/main.go
       - name: Run tests and generate coverage report
         run: go test -race -coverprofile cover.out -covermode atomic ./...
+      - name: Publish code coverage to Code Climate
+        uses: paambaati/codeclimate-action@v2.7.5
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CODE_CLIMATE_TEST_REPORTER_ID }}
+        with:
+          prefix: github.com/SpecializedGeneralist/hnsw-grpc-server
+          coverageLocations: ${{github.workspace}}/cover.out:gocov
