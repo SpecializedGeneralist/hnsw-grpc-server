@@ -13,7 +13,7 @@ This package includes the relevant sources from the [hnswlib](https://github.com
 
 A list of API methods now follows:
 
-| Method | Description | 
+| Method | Description |
 | -------------- | --------- |
 | CreateIndex | Make a new index |
 | DeleteIndex | Removes an index |
@@ -23,7 +23,6 @@ A list of API methods now follows:
 | FlushIndex | Serialize the index to file |
 | Indices | Return the list of indices |
 | SetEf | Set the `ef` parameter for the given index |
-
 
 ## Usage
 
@@ -49,7 +48,7 @@ It should print:
 2021-04-04T21:55:37Z INF Starting: gRPC Listener [0.0.0.0:19530]
 ```
 
-# Credits
+## Credits
 
 - [hnswlib](https://github.com/nmslib/hnswlib) - Header-only C++ HNSW implementation.
 - [hnswgo](https://github.com/evan176/hnswgo) - Go interface for hnswlib.
