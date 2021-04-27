@@ -1,0 +1,26 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install g++ gcc
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ^1.16.3
+      - uses: actions/checkout@v2
+      - name: Download Go dependencies
+        run: go mod download
+      - name: Build hnswlib wrapper
+        run: pkg/hnswgo/make.sh
+      - name: Build hnsw-grpc-server
+        env:
+          CGO_CXXFLAGS: -std=c++11
+          CGO_ENABLED: 1
+        run: go build -ldflags="-extldflags=-static" -o hnsw-grpc-server cmd/main.go
+      - name: Run tests and generate coverage report
+        run: go test -race -coverprofile cover.out -covermode atomic ./...
