@@ -12,29 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.15.7-alpine3.13 as Builder
+FROM golang:1.16.3-alpine3.13 as Builder
 
-RUN set -eux; \
-	apk add --no-cache --virtual .build-deps \
-		gcc \
-		g++ \
-		musl-dev \
-        ;
+RUN apk add --no-cache \
+        gcc \
+        g++ \
+        musl-dev
 
-RUN mkdir /data
-RUN mkdir /build
-ADD . /build/
-WORKDIR /build
-RUN cd pkg/internal/hnswgo/ && sh make.sh
-RUN go mod download
-RUN GOOS=linux GOARCH=amd64 CGO_CXXFLAGS="-std=c++11" CGO_ENABLED=1 go build -ldflags="-extldflags=-static" -o entrypoint cmd/main.go
+WORKDIR /go/src/hnsw-grpc-server
+COPY . .
+
+RUN set -x \
+    && mkdir /usr/local/hnsw-grpc-server-data \
+    && pkg/hnswgo/make.sh \
+    && go mod download \
+    && CGO_CXXFLAGS="-std=c++11" CGO_ENABLED=1 go build \
+        -ldflags="-extldflags=-static" \
+        -o /go/bin/hnsw-grpc-server \
+        cmd/main.go
 
 FROM scratch
 
-COPY --from=Builder /data /data
-COPY --from=Builder /build/entrypoint /entrypoint
+COPY --from=Builder /go/bin/hnsw-grpc-server /hnsw-grpc-server
+COPY --from=Builder /usr/local/hnsw-grpc-server-data /hnsw-grpc-server-data
 
-ENV GOOS linux
-ENV GOARCH amd64
-ENTRYPOINT ["/entrypoint"]
-CMD ["help"]
+ENTRYPOINT ["/hnsw-grpc-server"]
