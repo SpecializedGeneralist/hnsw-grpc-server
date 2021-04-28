@@ -49,6 +49,13 @@ type HNSW struct {
 	rwMx sync.RWMutex
 }
 
+// hnswState provides serializable configuration settings and other
+// parameters for the internal state of a HNSW object.
+type hnswState struct {
+	Config
+	LastAutoID uint32
+}
+
 const (
 	// IPSpace identifies an Inner Product space.
 	IPSpace SpaceType = "ip"
@@ -96,10 +103,8 @@ func New(config Config) *HNSW {
 			config.SpaceType.cChar(),
 		),
 		state: hnswState{
-			Dim:           config.Dim,
-			SpaceType:     config.SpaceType,
-			AutoIDEnabled: config.AutoIDEnabled,
-			LastAutoID:    0,
+			Config:     config,
+			LastAutoID: 0,
 		},
 		rwMx: sync.RWMutex{},
 	}
@@ -318,15 +323,6 @@ func (h *HNSW) SetEf(ef int) {
 	defer h.rwMx.RUnlock()
 
 	C.setEf(h.index, C.int(ef))
-}
-
-// hnswState provides serializable configuration settings and other
-// parameters for the internal state of a HNSW object.
-type hnswState struct {
-	Dim           int
-	SpaceType     SpaceType
-	AutoIDEnabled bool
-	LastAutoID    uint32
 }
 
 func normalizeVector(vector []float32) []float32 {
