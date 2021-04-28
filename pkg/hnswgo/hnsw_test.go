@@ -196,6 +196,20 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 	assert.Equal(t, originalResults, newResults)
 }
 
+func TestHNSW_Save(t *testing.T) {
+	t.Parallel()
+
+	t.Run("path does not exist", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+
+		hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
+		err := hnsw.Save(path.Join(dir, "foo", "bar"))
+		assert.Error(t, err)
+	})
+}
+
 func TestHNSW_LoadingErrors(t *testing.T) {
 	t.Parallel()
 
@@ -262,20 +276,6 @@ func TestHNSW_LoadingErrors(t *testing.T) {
 
 		hnsw, err := hnswgo.Load(path.Join(dir, "foo"))
 		assert.Nil(t, hnsw)
-		assert.Error(t, err)
-	})
-}
-
-func TestHNSW_SavingErrors(t *testing.T) {
-	t.Parallel()
-
-	t.Run("the path does not exist", func(t *testing.T) {
-		t.Parallel()
-		dir := createTempDir(t)
-		defer deleteDir(t, dir)
-
-		hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
-		err := hnsw.Save(path.Join(dir, "foo", "bar"))
 		assert.Error(t, err)
 	})
 }
