@@ -100,8 +100,23 @@ func (im *IndexManager) CreateIndex(name string, config hnswgo.Config) (*hnswgo.
 		return nil, fmt.Errorf("index with name %#v already exists", name)
 	}
 
+	dir := path.Join(im.path, name)
+	dirExists, err := osutils.DirExists(dir)
+	if err != nil {
+		return nil, err
+	}
+	if dirExists {
+		return nil, fmt.Errorf("index dir %#v already exists", dir)
+	}
+
 	index := hnswgo.New(config)
 	im.indices[name] = index
+
+	err = im.persistIndex(name)
+	if err != nil {
+		return nil, fmt.Errorf("error persisting new index %#v: %w", dir, err)
+	}
+
 	return index, nil
 }
 
@@ -109,7 +124,10 @@ func (im *IndexManager) CreateIndex(name string, config hnswgo.Config) (*hnswgo.
 func (im *IndexManager) PersistIndex(name string) error {
 	im.rwMx.RLock()
 	defer im.rwMx.RUnlock()
+	return im.persistIndex(name)
+}
 
+func (im *IndexManager) persistIndex(name string) error {
 	index, indexExists := im.indices[name]
 	if !indexExists {
 		return fmt.Errorf("index does not exist")

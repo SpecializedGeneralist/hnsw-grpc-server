@@ -128,7 +128,9 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 
 	t.Run("creating valid index", func(t *testing.T) {
 		t.Parallel()
-		im := indexmanager.New(os.TempDir(), zerolog.Nop())
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
 
 		index, err := im.CreateIndex("foo", sampleConfig)
 		assert.NoError(t, err)
@@ -158,7 +160,9 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 
 	t.Run("invalid name", func(t *testing.T) {
 		t.Parallel()
-		im := indexmanager.New(os.TempDir(), zerolog.Nop())
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
 		index, err := im.CreateIndex("foo!?", sampleConfig)
 		assert.Error(t, err)
 		assert.Nil(t, index)
@@ -166,13 +170,45 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 
 	t.Run("index already exists", func(t *testing.T) {
 		t.Parallel()
-		im := indexmanager.New(os.TempDir(), zerolog.Nop())
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
 
 		index, err := im.CreateIndex("foo", sampleConfig)
 		assert.NoError(t, err)
 		assert.NotNil(t, index)
 
 		index, err = im.CreateIndex("foo", sampleConfig)
+		assert.Error(t, err)
+		assert.Nil(t, index)
+	})
+
+	t.Run("index dir already exists", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
+
+		err := os.Mkdir(path.Join(dir, "foo"), 0777)
+		assert.NoError(t, err)
+
+		index, err := im.CreateIndex("foo", sampleConfig)
+		assert.Error(t, err)
+		assert.Nil(t, index)
+	})
+
+	t.Run("index dir check error", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
+
+		file, err := os.Create(path.Join(dir, "foo"))
+		assert.NoError(t, err)
+		err = file.Close()
+		assert.NoError(t, err)
+
+		index, err := im.CreateIndex("foo", sampleConfig)
 		assert.Error(t, err)
 		assert.Nil(t, index)
 	})
@@ -238,12 +274,19 @@ func TestIndexManager_PersistIndex(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
-		im := indexmanager.New(path.Join(dir, "foo"), zerolog.Nop())
 
-		_, err := im.CreateIndex("bar", sampleConfig)
+		subDir := path.Join(dir, "sub")
+		err := os.Mkdir(subDir, 0777)
 		assert.NoError(t, err)
 
-		err = im.PersistIndex("bar")
+		im := indexmanager.New(subDir, zerolog.Nop())
+
+		_, err = im.CreateIndex("foo", sampleConfig)
+		assert.NoError(t, err)
+
+		deleteDir(t, subDir)
+
+		err = im.PersistIndex("foo")
 		assert.Error(t, err)
 	})
 }
@@ -253,7 +296,9 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 
 	t.Run("deleting non persisted index", func(t *testing.T) {
 		t.Parallel()
-		im := indexmanager.New(os.TempDir(), zerolog.Nop())
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
 
 		_, err := im.CreateIndex("bar", sampleConfig)
 		assert.NoError(t, err)
@@ -326,19 +371,6 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 		assert.DirExists(t, path.Join(dir, "bar"))
 	})
 
-	t.Run("error checking if index dir exists", func(t *testing.T) {
-		t.Parallel()
-		filename := createTempFile(t)
-		defer deleteFile(t, filename)
-		im := indexmanager.New(filename, zerolog.Nop())
-
-		_, err := im.CreateIndex("bar", sampleConfig)
-		assert.NoError(t, err)
-
-		err = im.DeleteIndex("bar")
-		assert.Error(t, err)
-	})
-
 	t.Run("index does not exist", func(t *testing.T) {
 		t.Parallel()
 		im := indexmanager.New(os.TempDir(), zerolog.Nop())
@@ -374,19 +406,5 @@ func createTempDir(t *testing.T) string {
 
 func deleteDir(t *testing.T, dir string) {
 	err := os.RemoveAll(dir)
-	assert.NoError(t, err)
-}
-
-func createTempFile(t *testing.T) string {
-	file, err := os.CreateTemp("", "indexmanager_test")
-	assert.NoError(t, err)
-	filename := file.Name()
-	err = file.Close()
-	assert.NoError(t, err)
-	return filename
-}
-
-func deleteFile(t *testing.T, name string) {
-	err := os.Remove(name)
 	assert.NoError(t, err)
 }

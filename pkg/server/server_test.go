@@ -36,7 +36,9 @@ func TestServer_CreateIndex(t *testing.T) {
 
 	t.Run("successful creation", func(t *testing.T) {
 		t.Parallel()
-		im := indexmanager.New(os.TempDir(), zerolog.Nop())
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+		im := indexmanager.New(dir, zerolog.Nop())
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
 		_, err := srv.CreateIndex(ctx, sampleCreateIndexRequest)
@@ -448,14 +450,16 @@ func TestServer_FlushIndex(t *testing.T) {
 			AutoIDEnabled:  true,
 		})
 		assert.NoError(t, err)
-		assert.NoDirExists(t, path.Join(dir, "foo"))
+
+		err = os.Remove(path.Join(dir, "foo", "index"))
+		assert.NoError(t, err)
 
 		resp, err := srv.FlushIndex(ctx, &grpcapi.FlushRequest{
 			IndexName: "foo",
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.DirExists(t, path.Join(dir, "foo"))
+		assert.FileExists(t, path.Join(dir, "foo", "index"))
 	})
 
 	t.Run("request error", func(t *testing.T) {
