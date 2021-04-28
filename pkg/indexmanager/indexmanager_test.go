@@ -386,12 +386,12 @@ var sampleVectors = [][]float32{
 }
 
 func createAndSaveSampleIndex(t *testing.T, dir string) {
-	hnsw := hnswgo.New(sampleConfig)
+	hnsw := hnswgo.New(dir, sampleConfig)
 	for _, vector := range sampleVectors {
 		_, err := hnsw.AddPointAutoID(vector)
 		assert.NoError(t, err)
 	}
-	err := hnsw.Save(dir)
+	err := hnsw.Save()
 	assert.NoError(t, err)
 
 	assert.FileExists(t, path.Join(dir, "state"))

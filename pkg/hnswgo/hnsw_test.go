@@ -60,8 +60,10 @@ func TestSpaceTypeFromString(t *testing.T) {
 
 func TestHNSW_IPSpace(t *testing.T) {
 	t.Parallel()
+	dir := createTempDir(t)
+	defer deleteDir(t, dir)
 
-	hnsw := hnswgo.New(makeConfig(hnswgo.IPSpace, false))
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.IPSpace, false))
 
 	for i, vector := range sampleVectors {
 		err := hnsw.AddPoint(vector, uint32(i))
@@ -74,8 +76,10 @@ func TestHNSW_IPSpace(t *testing.T) {
 
 func TestHNSW_L2Space(t *testing.T) {
 	t.Parallel()
+	dir := createTempDir(t)
+	defer deleteDir(t, dir)
 
-	hnsw := hnswgo.New(makeConfig(hnswgo.L2Space, false))
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.L2Space, false))
 
 	for i, vector := range sampleVectors {
 		err := hnsw.AddPoint(vector, uint32(i))
@@ -88,8 +92,10 @@ func TestHNSW_L2Space(t *testing.T) {
 
 func TestHNSW_CosineSpace(t *testing.T) {
 	t.Parallel()
+	dir := createTempDir(t)
+	defer deleteDir(t, dir)
 
-	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, false))
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
 
 	for i, vector := range sampleVectors {
 		err := hnsw.AddPoint(vector, uint32(i))
@@ -113,8 +119,10 @@ func TestHNSW_CosineSpace(t *testing.T) {
 
 func TestHNSW_AutoIDDisabled(t *testing.T) {
 	t.Parallel()
+	dir := createTempDir(t)
+	defer deleteDir(t, dir)
 
-	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, false))
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
 
 	err := hnsw.AddPoint(sampleVectors[0], uint32(42))
 	assert.NoError(t, err)
@@ -130,8 +138,10 @@ func TestHNSW_AutoIDDisabled(t *testing.T) {
 
 func TestHNSW_AutoIDEnabled(t *testing.T) {
 	t.Parallel()
+	dir := createTempDir(t)
+	defer deleteDir(t, dir)
 
-	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true))
 
 	for i, vector := range sampleVectors {
 		id, err := hnsw.AddPointAutoID(vector)
@@ -149,8 +159,10 @@ func TestHNSW_AutoIDEnabled(t *testing.T) {
 
 func TestHNSW_MarkDelete(t *testing.T) {
 	t.Parallel()
+	dir := createTempDir(t)
+	defer deleteDir(t, dir)
 
-	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, false))
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
 
 	for i, vector := range sampleVectors {
 		err := hnsw.AddPoint(vector, uint32(i))
@@ -168,14 +180,13 @@ func TestHNSW_MarkDelete(t *testing.T) {
 
 func TestHNSW_SaveAndLoad(t *testing.T) {
 	t.Parallel()
-
 	dir := createTempDir(t)
 	defer deleteDir(t, dir)
 
 	var originalResults []hnswgo.KNNResult
 
 	{
-		hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, false))
+		hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
 
 		for i, vector := range sampleVectors {
 			err := hnsw.AddPoint(vector, uint32(i))
@@ -185,7 +196,7 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 		originalResults = hnsw.SearchKNN(sampleVectors[0], 2)
 		assert.Len(t, originalResults, 2)
 
-		err := hnsw.Save(dir)
+		err := hnsw.Save()
 		assert.NoError(t, err)
 	}
 
@@ -204,8 +215,8 @@ func TestHNSW_Save(t *testing.T) {
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
 
-		hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
-		err := hnsw.Save(path.Join(dir, "foo", "bar"))
+		hnsw := hnswgo.New(path.Join(dir, "foo", "bar"), makeConfig(hnswgo.CosineSpace, true))
+		err := hnsw.Save()
 		assert.Error(t, err)
 	})
 }
@@ -281,13 +292,14 @@ func TestHNSW_LoadingErrors(t *testing.T) {
 }
 
 func createAndSaveSampleIndex(t *testing.T, dir string) {
-	hnsw := hnswgo.New(makeConfig(hnswgo.CosineSpace, true))
+	t.Helper()
+	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true))
 	for i, vector := range sampleVectors {
 		id, err := hnsw.AddPointAutoID(vector)
 		assert.NoError(t, err)
 		assert.Equal(t, i+1, int(id))
 	}
-	err := hnsw.Save(dir)
+	err := hnsw.Save()
 	assert.NoError(t, err)
 
 	assert.FileExists(t, path.Join(dir, "state"))

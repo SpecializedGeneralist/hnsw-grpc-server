@@ -109,12 +109,12 @@ func (im *IndexManager) CreateIndex(name string, config hnswgo.Config) (*hnswgo.
 		return nil, fmt.Errorf("index dir %#v already exists", dir)
 	}
 
-	index := hnswgo.New(config)
+	index := hnswgo.New(dir, config)
 	im.indices[name] = index
 
-	err = im.persistIndex(name)
+	err = index.Save()
 	if err != nil {
-		return nil, fmt.Errorf("error persisting new index %#v: %w", dir, err)
+		return nil, fmt.Errorf("error persisting new index %#v: %w", name, err)
 	}
 
 	return index, nil
@@ -124,15 +124,12 @@ func (im *IndexManager) CreateIndex(name string, config hnswgo.Config) (*hnswgo.
 func (im *IndexManager) PersistIndex(name string) error {
 	im.rwMx.RLock()
 	defer im.rwMx.RUnlock()
-	return im.persistIndex(name)
-}
 
-func (im *IndexManager) persistIndex(name string) error {
 	index, indexExists := im.indices[name]
 	if !indexExists {
 		return fmt.Errorf("index does not exist")
 	}
-	err := index.Save(path.Join(im.path, name))
+	err := index.Save()
 	if err != nil {
 		return fmt.Errorf("error persisting index %#v: %w", name, err)
 	}

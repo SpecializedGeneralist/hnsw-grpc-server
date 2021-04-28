@@ -40,6 +40,7 @@ type SpaceType string
 
 // HNSW is an interface to HNSW C code.
 type HNSW struct {
+	dir   string
 	index C.HNSW
 	state hnswState
 	// Most operations lock the mutex for reading, including AddPoint and
@@ -92,8 +93,9 @@ func (st SpaceType) cChar() C.char {
 }
 
 // New creates a new HNSW index.
-func New(config Config) *HNSW {
+func New(dir string, config Config) *HNSW {
 	return &HNSW{
+		dir: dir,
 		index: C.initHNSW(
 			C.int(config.Dim),
 			C.ulong(config.MaxElements),
@@ -111,18 +113,19 @@ func New(config Config) *HNSW {
 }
 
 // Load loads an HNSW index from file.
-func Load(location string) (*HNSW, error) {
-	state, err := loadState(location)
+func Load(dir string) (*HNSW, error) {
+	state, err := loadState(dir)
 	if err != nil {
 		return nil, err
 	}
 
-	index, err := loadIndex(location, state.Dim, state.SpaceType)
+	index, err := loadIndex(dir, state.Dim, state.SpaceType)
 	if err != nil {
 		return nil, err
 	}
 
 	return &HNSW{
+		dir:   dir,
 		index: index,
 		state: *state,
 		rwMx:  sync.RWMutex{},
@@ -188,30 +191,30 @@ func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
 }
 
 // Save saves the HNSW index to file.
-func (h *HNSW) Save(location string) error {
+func (h *HNSW) Save() error {
 	h.rwMx.Lock()
 	defer h.rwMx.Unlock()
 
-	err := ensureDirExists(location)
+	err := ensureDirExists(h.dir)
 	if err != nil {
 		return err
 	}
 
 	// Create new temporary files: if something goes wrong, the old
 	// files (if any) will not be corrupted.
-	err = h.saveState(path.Join(location, "state.tmp"))
+	err = h.saveState(path.Join(h.dir, "state.tmp"))
 	if err != nil {
 		return err
 	}
-	h.saveIndex(path.Join(location, "index.tmp"))
+	h.saveIndex(path.Join(h.dir, "index.tmp"))
 
 	// Now that the temporary files are successfully created, replace
 	// the old files (if any) with the new ones.
-	err = os.Rename(path.Join(location, "state.tmp"), path.Join(location, "state"))
+	err = os.Rename(path.Join(h.dir, "state.tmp"), path.Join(h.dir, "state"))
 	if err != nil {
 		return err
 	}
-	err = os.Rename(path.Join(location, "index.tmp"), path.Join(location, "index"))
+	err = os.Rename(path.Join(h.dir, "index.tmp"), path.Join(h.dir, "index"))
 	if err != nil {
 		return err
 	}
