@@ -4,7 +4,7 @@ package hnswgo
 // #include <stdlib.h>
 // #include "hnsw_wrapper.h"
 // HNSW initHNSW(int dim, unsigned long int max_elements, int M, int ef_construction, int rand_seed, char stype);
-// HNSW loadHNSW(char *location, int dim, char stype);
+// HNSW loadHNSW(char *location, int dim, unsigned long int max_elements, char stype);
 // void saveHNSW(HNSW index, char *location);
 // void addPoint(HNSW index, float *vec, unsigned long int label);
 // void markDelete(HNSW index, unsigned long int label);
@@ -191,6 +191,7 @@ func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
 	index := C.loadHNSW(
 		pFilename,
 		C.int(dim),
+		C.ulong(maxElements),
 		spaceType.cChar(),
 	)
 	return index, nil

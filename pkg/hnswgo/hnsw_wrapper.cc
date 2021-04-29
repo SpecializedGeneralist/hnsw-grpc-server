@@ -15,14 +15,14 @@ HNSW initHNSW(int dim, unsigned long int max_elements, int M, int ef_constructio
   return (void*)appr_alg;
 }
 
-HNSW loadHNSW(char *location, int dim, char stype) {
+HNSW loadHNSW(char *location, int dim, unsigned long int max_elements, char stype) {
   hnswlib::SpaceInterface<float> *space;
   if (stype == 'i') {
     space = new hnswlib::InnerProductSpace(dim);
   } else {
     space = new hnswlib::L2Space(dim);
   }
-  hnswlib::HierarchicalNSW<float> *appr_alg = new hnswlib::HierarchicalNSW<float>(space, std::string(location), false, 0);
+  hnswlib::HierarchicalNSW<float> *appr_alg = new hnswlib::HierarchicalNSW<float>(space, std::string(location), false, max_elements);
   return (void*)appr_alg;
 }
 
