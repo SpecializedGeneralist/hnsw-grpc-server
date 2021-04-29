@@ -76,8 +76,7 @@ func (im *IndexManager) LoadIndices() error {
 	return nil
 }
 
-// GetIndex returns the in-memory HNSW index (if it exists) and reports
-// whether it is found.
+// GetIndex returns the HNSW index (if it exists) and reports whether it is found.
 func (im *IndexManager) GetIndex(name string) (*hnswgo.HNSW, bool) {
 	im.rwMx.RLock()
 	defer im.rwMx.RUnlock()
@@ -86,7 +85,7 @@ func (im *IndexManager) GetIndex(name string) (*hnswgo.HNSW, bool) {
 	return index, found
 }
 
-// CreateIndex creates a new in-memory index with the given name.
+// CreateIndex creates and persists a new index with the given name.
 // If the name is not acceptable or an index with the same name already
 // exists, an error is returned.
 func (im *IndexManager) CreateIndex(name string, config hnswgo.Config) (*hnswgo.HNSW, error) {
@@ -136,8 +135,7 @@ func (im *IndexManager) PersistIndex(name string) error {
 	return nil
 }
 
-// DeleteIndex remove an index from the in-memory storage and, if the index was
-// persisted, also from disk.
+// DeleteIndex remove an index, also removing data from disk.
 func (im *IndexManager) DeleteIndex(name string) error {
 	im.rwMx.Lock()
 	defer im.rwMx.Unlock()
@@ -162,7 +160,7 @@ func (im *IndexManager) DeleteIndex(name string) error {
 	return nil
 }
 
-// IndicesNames returns the names of all in-memory indices.
+// IndicesNames returns the names of all indices.
 func (im *IndexManager) IndicesNames() []string {
 	im.rwMx.RLock()
 	defer im.rwMx.RUnlock()
