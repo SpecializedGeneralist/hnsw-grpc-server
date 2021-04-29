@@ -282,6 +282,9 @@ func (s *Server) SetEf(_ context.Context, req *grpcapi.SetEfRequest) (*emptypb.E
 	if !indexExists {
 		return nil, fmt.Errorf("index not found")
 	}
-	index.SetEf(int(req.GetValue()))
+	err := index.SetEf(int(req.GetValue()))
+	if err != nil {
+		return nil, err
+	}
 	return &emptypb.Empty{}, nil
 }

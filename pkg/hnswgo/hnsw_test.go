@@ -172,7 +172,8 @@ func TestHNSW_MarkDelete(t *testing.T) {
 	results := hnsw.SearchKNN(sampleVectors[0], 1)
 	assert.Equal(t, uint32(0), results[0].ID)
 
-	hnsw.MarkDelete(0)
+	err := hnsw.MarkDelete(0)
+	assert.NoError(t, err)
 
 	results = hnsw.SearchKNN(sampleVectors[0], 1)
 	assert.Equal(t, uint32(1), results[0].ID)

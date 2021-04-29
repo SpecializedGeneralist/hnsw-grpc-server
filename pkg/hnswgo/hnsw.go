@@ -16,6 +16,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/osutils"
+	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/wal"
 	"math"
 	"os"
 	"path"
@@ -43,6 +44,9 @@ type HNSW struct {
 	dir   string
 	index C.HNSW
 	state hnswState
+	// log is the write-ahead log for all index operations.
+	// It is deleted (i.e. emptied) only after successful saving.
+	log *wal.Log
 	// Most operations lock the mutex for reading, including AddPoint and
 	// AddPointAutoID, since the actual locking of critical parts is
 	// already implemented in the native C++ code.
@@ -108,6 +112,7 @@ func New(dir string, config Config) *HNSW {
 			Config:     config,
 			LastAutoID: 0,
 		},
+		log:  wal.NewLog(path.Join(dir, "log")),
 		rwMx: sync.RWMutex{},
 	}
 }
@@ -128,6 +133,7 @@ func Load(dir string) (*HNSW, error) {
 		dir:   dir,
 		index: index,
 		state: *state,
+		log:   wal.NewLog(path.Join(dir, "log")),
 		rwMx:  sync.RWMutex{},
 	}, nil
 }
@@ -219,6 +225,11 @@ func (h *HNSW) Save() error {
 		return err
 	}
 
+	err = h.log.Delete()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -251,8 +262,7 @@ func (h *HNSW) AddPoint(vector []float32, id uint32) error {
 	if h.state.AutoIDEnabled {
 		return fmt.Errorf("invalid call to HNSW.AddPoint with auto-ID enabled")
 	}
-	h.addPoint(vector, id)
-	return nil
+	return h.addPoint(vector, id)
 }
 
 // AddPointAutoID adds a new vector to the index.
@@ -261,27 +271,42 @@ func (h *HNSW) AddPointAutoID(vector []float32) (uint32, error) {
 		return 0, fmt.Errorf("invalid call to HNSW.AddPointAutoID with auto-ID disabled")
 	}
 	id := atomic.AddUint32(&h.state.LastAutoID, 1)
-	h.addPoint(vector, id)
+	err := h.addPoint(vector, id)
+	if err != nil {
+		return 0, err
+	}
 	return id, nil
 }
 
-func (h *HNSW) addPoint(vector []float32, id uint32) {
+func (h *HNSW) addPoint(vector []float32, id uint32) error {
 	h.rwMx.RLock()
 	defer h.rwMx.RUnlock()
+
+	err := h.log.WritePointAddition(vector, id)
+	if err != nil {
+		return err
+	}
 
 	if h.state.SpaceType == "cosine" {
 		vector = normalizeVector(vector)
 	}
 	C.addPoint(h.index, (*C.float)(unsafe.Pointer(&vector[0])), C.ulong(id))
+	return nil
 }
 
 // MarkDelete marks an element with the given ID deleted.
 // It does not really change the current graph.
-func (h *HNSW) MarkDelete(id uint32) {
+func (h *HNSW) MarkDelete(id uint32) error {
 	h.rwMx.RLock()
 	defer h.rwMx.RUnlock()
 
+	err := h.log.WriteDeletionMark(id)
+	if err != nil {
+		return err
+	}
+
 	C.markDelete(h.index, C.ulong(id))
+	return nil
 }
 
 // KNNResult is an ID/Distance pair, which is a single result
@@ -321,11 +346,17 @@ func (h *HNSW) SearchKNN(vector []float32, N int) []KNNResult {
 }
 
 // SetEf sets the "ef" parameter.
-func (h *HNSW) SetEf(ef int) {
+func (h *HNSW) SetEf(ef int) error {
 	h.rwMx.RLock()
 	defer h.rwMx.RUnlock()
 
+	err := h.log.WriteEfSetting(ef)
+	if err != nil {
+		return err
+	}
+
 	C.setEf(h.index, C.int(ef))
+	return nil
 }
 
 func normalizeVector(vector []float32) []float32 {

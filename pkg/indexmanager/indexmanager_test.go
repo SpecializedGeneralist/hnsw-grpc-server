@@ -19,6 +19,7 @@ import (
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/indexmanager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path"
 	"testing"
@@ -96,6 +97,8 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
 
+		createDir(t, path.Join(dir, "foo"))
+		createDir(t, path.Join(dir, "bar"))
 		createAndSaveSampleIndex(t, path.Join(dir, "foo"))
 		createAndSaveSampleIndex(t, path.Join(dir, "bar"))
 
@@ -402,6 +405,11 @@ func createTempDir(t *testing.T) string {
 	dir, err := os.MkdirTemp("", "indexmanager_test")
 	assert.NoError(t, err)
 	return dir
+}
+
+func createDir(t *testing.T, name string) {
+	err := os.Mkdir(name, 0777)
+	require.NoError(t, err)
 }
 
 func deleteDir(t *testing.T, dir string) {
