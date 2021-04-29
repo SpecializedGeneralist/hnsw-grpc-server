@@ -181,31 +181,98 @@ func TestHNSW_MarkDelete(t *testing.T) {
 
 func TestHNSW_SaveAndLoad(t *testing.T) {
 	t.Parallel()
-	dir := createTempDir(t)
-	defer deleteDir(t, dir)
 
-	var originalResults []hnswgo.KNNResult
+	t.Run("load after explicit save", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
 
-	{
-		hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
+		var originalResults []hnswgo.KNNResult
+		{
+			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
 
-		for i, vector := range sampleVectors {
-			err := hnsw.AddPoint(vector, uint32(i))
+			for i, vector := range sampleVectors {
+				err := hnsw.AddPoint(vector, uint32(i))
+				assert.NoError(t, err)
+			}
+
+			originalResults = hnsw.SearchKNN(sampleVectors[0], 2)
+			assert.Len(t, originalResults, 2)
+
+			err := hnsw.Save()
 			assert.NoError(t, err)
 		}
 
-		originalResults = hnsw.SearchKNN(sampleVectors[0], 2)
-		assert.Len(t, originalResults, 2)
-
-		err := hnsw.Save()
+		hnsw, err := hnswgo.Load(dir)
 		assert.NoError(t, err)
-	}
 
-	hnsw, err := hnswgo.Load(dir)
-	assert.NoError(t, err)
+		newResults := hnsw.SearchKNN(sampleVectors[0], 2)
+		assert.Equal(t, originalResults, newResults)
+	})
 
-	newResults := hnsw.SearchKNN(sampleVectors[0], 2)
-	assert.Equal(t, originalResults, newResults)
+	t.Run("load auto-id index from log without explicit save", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+
+		{
+			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true))
+			// Initial save, just for creating the files
+			err := hnsw.Save()
+			assert.NoError(t, err)
+
+			_, err = hnsw.AddPointAutoID(sampleVectors[0])
+			assert.NoError(t, err)
+
+			_, err = hnsw.AddPointAutoID(sampleVectors[1])
+			assert.NoError(t, err)
+
+			err = hnsw.MarkDelete(2)
+			assert.NoError(t, err)
+
+			err = hnsw.SetEf(150)
+			assert.NoError(t, err)
+		}
+
+		hnsw, err := hnswgo.Load(dir)
+		assert.NoError(t, err)
+
+		results := hnsw.SearchKNN(sampleVectors[0], 2)
+		assert.Len(t, results, 1)
+		assert.Equal(t, uint32(1), results[0].ID)
+	})
+
+	t.Run("load custom-id index from log without explicit save", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+
+		{
+			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false))
+			// Initial save, just for creating the files
+			err := hnsw.Save()
+			assert.NoError(t, err)
+
+			err = hnsw.AddPoint(sampleVectors[0], 1)
+			assert.NoError(t, err)
+
+			err = hnsw.AddPoint(sampleVectors[1], 2)
+			assert.NoError(t, err)
+
+			err = hnsw.MarkDelete(2)
+			assert.NoError(t, err)
+
+			err = hnsw.SetEf(150)
+			assert.NoError(t, err)
+		}
+
+		hnsw, err := hnswgo.Load(dir)
+		assert.NoError(t, err)
+
+		results := hnsw.SearchKNN(sampleVectors[0], 2)
+		assert.Len(t, results, 1)
+		assert.Equal(t, uint32(1), results[0].ID)
+	})
 }
 
 func TestHNSW_Save(t *testing.T) {

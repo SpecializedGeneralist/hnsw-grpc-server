@@ -124,18 +124,23 @@ func Load(dir string) (*HNSW, error) {
 		return nil, err
 	}
 
-	index, err := loadIndex(dir, state.Dim, state.SpaceType)
+	index, err := loadIndex(dir, state.Dim, state.MaxElements, state.SpaceType)
 	if err != nil {
 		return nil, err
 	}
 
-	return &HNSW{
+	h := &HNSW{
 		dir:   dir,
 		index: index,
 		state: *state,
 		log:   wal.NewLog(path.Join(dir, "log")),
 		rwMx:  sync.RWMutex{},
-	}, nil
+	}
+	err = h.loadLog()
+	if err != nil {
+		return nil, err
+	}
+	return h, nil
 }
 
 func loadState(dir string) (_ *hnswState, err error) {
@@ -167,7 +172,7 @@ func loadState(dir string) (_ *hnswState, err error) {
 	return state, nil
 }
 
-func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
+func loadIndex(dir string, dim int, maxElements int, spaceType SpaceType) (C.HNSW, error) {
 	tmpFilename := path.Join(dir, "index.tmp")
 	tmpExists, err := osutils.FileExists(tmpFilename)
 	if err != nil {
@@ -195,6 +200,26 @@ func loadIndex(dir string, dim int, spaceType SpaceType) (C.HNSW, error) {
 		spaceType.cChar(),
 	)
 	return index, nil
+}
+
+func (h *HNSW) loadLog() error {
+	return h.log.Read(h.logReadCallback)
+}
+
+func (h *HNSW) logReadCallback(e interface{}) error {
+	var err error
+	switch et := e.(type) {
+	case wal.PointAddition:
+		if h.state.AutoIDEnabled && h.state.LastAutoID < et.ID {
+			h.state.LastAutoID = et.ID
+		}
+		err = h.addPoint(et.Vector, et.ID, false)
+	case wal.DeletionMark:
+		C.markDelete(h.index, C.ulong(et.ID))
+	case wal.EfSetting:
+		C.setEf(h.index, C.int(et.Ef))
+	}
+	return err
 }
 
 // Save saves the HNSW index to file.
@@ -263,7 +288,7 @@ func (h *HNSW) AddPoint(vector []float32, id uint32) error {
 	if h.state.AutoIDEnabled {
 		return fmt.Errorf("invalid call to HNSW.AddPoint with auto-ID enabled")
 	}
-	return h.addPoint(vector, id)
+	return h.addPoint(vector, id, true)
 }
 
 // AddPointAutoID adds a new vector to the index.
@@ -272,20 +297,22 @@ func (h *HNSW) AddPointAutoID(vector []float32) (uint32, error) {
 		return 0, fmt.Errorf("invalid call to HNSW.AddPointAutoID with auto-ID disabled")
 	}
 	id := atomic.AddUint32(&h.state.LastAutoID, 1)
-	err := h.addPoint(vector, id)
+	err := h.addPoint(vector, id, true)
 	if err != nil {
 		return 0, err
 	}
 	return id, nil
 }
 
-func (h *HNSW) addPoint(vector []float32, id uint32) error {
+func (h *HNSW) addPoint(vector []float32, id uint32, writeToLog bool) error {
 	h.rwMx.RLock()
 	defer h.rwMx.RUnlock()
 
-	err := h.log.WritePointAddition(vector, id)
-	if err != nil {
-		return err
+	if writeToLog {
+		err := h.log.WritePointAddition(vector, id)
+		if err != nil {
+			return err
+		}
 	}
 
 	if h.state.SpaceType == "cosine" {
