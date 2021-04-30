@@ -115,7 +115,7 @@ func TestLog_Read(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("read corrupted file", func(t *testing.T) {
+	t.Run("read partially corrupted file", func(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
@@ -157,7 +157,7 @@ func TestLog_Read(t *testing.T) {
 		assert.Equal(t, expectedEntries, actualEntries)
 	})
 
-	t.Run("read partially corrupted file", func(t *testing.T) {
+	t.Run("read corrupted file", func(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
