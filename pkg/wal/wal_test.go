@@ -31,24 +31,16 @@ func TestLog(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
-		filename := path.Join(dir, "log")
-		log := wal.NewLog(filename)
-		defer log.Close()
+		log := wal.NewLog(path.Join(dir, "log"))
+		defer mustCloseLog(t, log)
 
-		err := log.WritePointAddition([]float32{1, 2, 3}, 10)
-		require.NoError(t, err)
-
-		err = log.WritePointAddition([]float32{4, 5, 6}, 20)
-		require.NoError(t, err)
-
-		err = log.WriteDeletionMark(10)
-		require.NoError(t, err)
-
-		err = log.WriteEfSetting(42)
-		require.NoError(t, err)
+		require.NoError(t, log.WritePointAddition([]float32{1, 2, 3}, 10))
+		require.NoError(t, log.WritePointAddition([]float32{4, 5, 6}, 20))
+		require.NoError(t, log.WriteDeletionMark(10))
+		require.NoError(t, log.WriteEfSetting(42))
 
 		actualEntries := make([]interface{}, 0)
-		err = log.Read(func(e interface{}) error {
+		err := log.Read(func(e interface{}) error {
 			actualEntries = append(actualEntries, e)
 			return nil
 		})
@@ -67,12 +59,10 @@ func TestLog(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
-		filename := path.Join(dir, "foo", "log")
-		log := wal.NewLog(filename)
-		defer log.Close()
+		log := wal.NewLog(path.Join(dir, "foo", "log"))
+		defer mustCloseLog(t, log)
 
-		err := log.WriteEfSetting(42)
-		assert.Error(t, err)
+		assert.Error(t, log.WriteEfSetting(42))
 	})
 }
 
@@ -85,7 +75,7 @@ func TestLog_Read(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
 		require.NoFileExists(t, filename)
 		err := log.Read(func(e interface{}) error {
@@ -101,12 +91,11 @@ func TestLog_Read(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
 		file, err := os.Create(filename)
 		require.NoError(t, err)
-		err = file.Close()
-		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
 		err = log.Read(func(e interface{}) error {
 			assert.Fail(t, "read callback should not be invoked")
@@ -121,27 +110,20 @@ func TestLog_Read(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
-		err := log.WriteEfSetting(1)
-		require.NoError(t, err)
-		err = log.WriteEfSetting(2)
-		require.NoError(t, err)
+		require.NoError(t, log.WriteEfSetting(1))
+		require.NoError(t, log.WriteEfSetting(2))
+		require.NoError(t, log.Close())
 
-		err = log.Close()
-		require.NoError(t, err)
-
-		file, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_SYNC, 0666)
+		file, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND, 0666)
 		require.NoError(t, err)
 		_, err = file.Write([]byte("foo!"))
 		require.NoError(t, err)
-		err = file.Close()
-		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
-		err = log.WriteEfSetting(3)
-		require.NoError(t, err)
-		err = log.WriteEfSetting(4)
-		require.NoError(t, err)
+		require.NoError(t, log.WriteEfSetting(3))
+		require.NoError(t, log.WriteEfSetting(4))
 
 		actualEntries := make([]interface{}, 0)
 		err = log.Read(func(e interface{}) error {
@@ -163,14 +145,13 @@ func TestLog_Read(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
 		file, err := os.Create(filename)
 		require.NoError(t, err)
 		_, err = file.Write([]byte("foo!"))
 		require.NoError(t, err)
-		err = file.Close()
-		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
 		err = log.Read(func(e interface{}) error {
 			assert.Fail(t, "read callback should not be invoked")
@@ -183,13 +164,11 @@ func TestLog_Read(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
-		filename := path.Join(dir, "log")
-		log := wal.NewLog(filename)
-		defer log.Close()
+		log := wal.NewLog(path.Join(dir, "log"))
+		defer mustCloseLog(t, log)
 
 		for i := 1; i <= 4; i++ {
-			err := log.WriteEfSetting(i)
-			require.NoError(t, err)
+			require.NoError(t, log.WriteEfSetting(i))
 		}
 
 		myError := fmt.Errorf("my error")
@@ -223,8 +202,7 @@ func TestLog_Close(t *testing.T) {
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
 
-		err := log.Close()
-		assert.NoError(t, err)
+		assert.NoError(t, log.Close())
 		assert.NoFileExists(t, filename)
 	})
 
@@ -232,14 +210,10 @@ func TestLog_Close(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
-		filename := path.Join(dir, "log")
-		log := wal.NewLog(filename)
+		log := wal.NewLog(path.Join(dir, "log"))
 
-		err := log.WriteEfSetting(42)
-		require.NoError(t, err)
-
-		err = log.Close()
-		assert.NoError(t, err)
+		require.NoError(t, log.WriteEfSetting(42))
+		assert.NoError(t, log.Close())
 	})
 }
 
@@ -252,11 +226,10 @@ func TestLog_Delete(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
 		require.NoFileExists(t, filename)
-		err := log.Delete()
-		assert.NoError(t, err)
+		assert.NoError(t, log.Delete())
 	})
 
 	t.Run("it removes the file", func(t *testing.T) {
@@ -265,15 +238,13 @@ func TestLog_Delete(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
 		file, err := os.Create(filename)
 		require.NoError(t, err)
-		err = file.Close()
-		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
-		err = log.Delete()
-		assert.NoError(t, err)
+		assert.NoError(t, log.Delete())
 		assert.NoFileExists(t, filename)
 	})
 
@@ -283,14 +254,12 @@ func TestLog_Delete(t *testing.T) {
 		defer deleteDir(t, dir)
 		filename := path.Join(dir, "log")
 		log := wal.NewLog(filename)
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
-		err := log.WriteEfSetting(42)
-		require.NoError(t, err)
+		require.NoError(t, log.WriteEfSetting(42))
 
 		assert.FileExists(t, filename)
-		err = log.Delete()
-		assert.NoError(t, err)
+		assert.NoError(t, log.Delete())
 		assert.NoFileExists(t, filename)
 	})
 
@@ -299,12 +268,16 @@ func TestLog_Delete(t *testing.T) {
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
 		log := wal.NewLog(dir) // dir instead of file
-		defer log.Close()
+		defer mustCloseLog(t, log)
 
-		err := log.Delete()
-		assert.Error(t, err)
+		assert.Error(t, log.Delete())
 		assert.DirExists(t, dir, "the dir must not be removed")
 	})
+}
+
+func mustCloseLog(t *testing.T, l *wal.Log) {
+	t.Helper()
+	require.NoError(t, l.Close())
 }
 
 func createTempDir(t *testing.T) string {
@@ -316,6 +289,5 @@ func createTempDir(t *testing.T) string {
 
 func deleteDir(t *testing.T, dir string) {
 	t.Helper()
-	err := os.RemoveAll(dir)
-	require.NoError(t, err)
+	require.NoError(t, os.RemoveAll(dir))
 }
