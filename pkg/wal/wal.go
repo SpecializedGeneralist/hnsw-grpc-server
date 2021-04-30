@@ -98,7 +98,7 @@ func (log *Log) WriteEfSetting(ef int) error {
 //
 // The callback function can return an error; if it is not nil, the entries
 // iteration will stop, and the Read function will returned the same error.
-func (log *Log) Read(f func(e interface{}) error) (err error) {
+func (log *Log) Read(fn func(e interface{}) error) (err error) {
 	log.mx.Lock()
 	defer log.mx.Unlock()
 
@@ -123,6 +123,10 @@ func (log *Log) Read(f func(e interface{}) error) (err error) {
 		}
 	}()
 
+	return log.readFile(file, fn)
+}
+
+func (log *Log) readFile(file *os.File, fn func(e interface{}) error) (err error) {
 	decoder := gob.NewDecoder(file)
 	for {
 		var e interface{}
@@ -133,7 +137,7 @@ func (log *Log) Read(f func(e interface{}) error) (err error) {
 		if err != nil {
 			return fmt.Errorf("error decoding entry from log file %#v: %w", log.filename, err)
 		}
-		err = f(e)
+		err = fn(e)
 		if err != nil {
 			return err
 		}
