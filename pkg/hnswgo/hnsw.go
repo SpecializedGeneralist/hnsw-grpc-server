@@ -207,23 +207,42 @@ func loadIndex(dir string, state *hnswState, logger zerolog.Logger) (C.HNSW, err
 }
 
 func (h *HNSW) loadLog() error {
-	return h.log.Read(h.logReadCallback)
-}
+	var innerErr error
 
-func (h *HNSW) logReadCallback(e interface{}) error {
-	var err error
-	switch et := e.(type) {
-	case wal.PointAddition:
-		if h.state.AutoIDEnabled && h.state.LastAutoID < et.ID {
-			h.state.LastAutoID = et.ID
+	readErr := h.log.Read(func(e interface{}) error {
+		switch et := e.(type) {
+		case wal.PointAddition:
+			if h.state.AutoIDEnabled && h.state.LastAutoID < et.ID {
+				h.state.LastAutoID = et.ID
+			}
+			innerErr = h.addPoint(et.Vector, et.ID, false)
+		case wal.DeletionMark:
+			C.markDelete(h.index, C.ulong(et.ID))
+		case wal.EfSetting:
+			C.setEf(h.index, C.int(et.Ef))
+		default:
+			innerErr = fmt.Errorf("unexpected log entry %#v", e)
 		}
-		err = h.addPoint(et.Vector, et.ID, false)
-	case wal.DeletionMark:
-		C.markDelete(h.index, C.ulong(et.ID))
-	case wal.EfSetting:
-		C.setEf(h.index, C.int(et.Ef))
+		return innerErr
+	})
+
+	// Errors occurring in the inner code above are considered fatal
+	// (in this case readErr should be the same as innerErr)
+	if innerErr != nil {
+		return fmt.Errorf("error applying log entries: %w", innerErr)
 	}
-	return err
+
+	// Another error might occur in the Read function itself. It probably
+	// implies a corrupted (e.g. partially written) log file.
+	// Partially written records would have caused an explicit error when the
+	// caller/client was attempting to perform that operation in a first place.
+	// So we can still consider the log-based recovery fully performed, and
+	// just log a message.
+	if readErr != nil {
+		h.logger.Warn().Err(readErr).
+			Msg("an error occurred reading log entries - the index will load anyway")
+	}
+	return nil
 }
 
 // Save saves the HNSW index to file.

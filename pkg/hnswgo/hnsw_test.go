@@ -275,6 +275,36 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 		assert.Len(t, results, 1)
 		assert.Equal(t, uint32(1), results[0].ID)
 	})
+
+	t.Run("index is still recovered from a partially corrupted log", func(t *testing.T) {
+		t.Parallel()
+		dir := createTempDir(t)
+		defer deleteDir(t, dir)
+
+		{
+			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true), zerolog.Nop())
+			// Initial save, just for creating the files
+			err := hnsw.Save()
+			assert.NoError(t, err)
+
+			_, err = hnsw.AddPointAutoID(sampleVectors[0])
+			assert.NoError(t, err)
+		}
+
+		file, err := os.OpenFile(path.Join(dir, "log"), os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_SYNC, 0666)
+		require.NoError(t, err)
+		_, err = file.Write([]byte("foo!"))
+		require.NoError(t, err)
+		err = file.Close()
+		require.NoError(t, err)
+
+		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
+		assert.NoError(t, err)
+
+		results := hnsw.SearchKNN(sampleVectors[0], 1)
+		assert.Len(t, results, 1)
+		assert.Equal(t, uint32(1), results[0].ID)
+	})
 }
 
 func TestHNSW_Save(t *testing.T) {
