@@ -17,6 +17,7 @@ package osutils_test
 import (
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/osutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path"
 	"testing"
@@ -85,26 +86,27 @@ func TestFileExists(t *testing.T) {
 }
 
 func createTempDir(t *testing.T) string {
+	t.Helper()
 	dir, err := os.MkdirTemp("", "osutils_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return dir
 }
 
 func deleteDir(t *testing.T, dir string) {
-	err := os.RemoveAll(dir)
-	assert.NoError(t, err)
+	t.Helper()
+	require.NoError(t, os.RemoveAll(dir))
 }
 
 func createTempFile(t *testing.T) string {
+	t.Helper()
 	file, err := os.CreateTemp("", "osutils_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	filename := file.Name()
-	err = file.Close()
-	assert.NoError(t, err)
+	require.NoError(t, file.Close())
 	return filename
 }
 
 func deleteFile(t *testing.T, name string) {
-	err := os.Remove(name)
-	assert.NoError(t, err)
+	t.Helper()
+	require.NoError(t, os.Remove(name))
 }
