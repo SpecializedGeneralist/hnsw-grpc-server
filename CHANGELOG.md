@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The internal state (i.e. `type hnswState`), which is persisted to disk when
   saving an index, now contains all the index configuration parameters.
   This might be convenient for indices inspection and recovery.
+- Refactor and improve test cases.
 
 ### Removed
 - File `hnsw_wrapper.o`, which is part of the building process.
