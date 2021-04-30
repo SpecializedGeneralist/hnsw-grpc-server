@@ -4,11 +4,17 @@
 [![Maintainability](https://api.codeclimate.com/v1/badges/7b5c7fd17aada5ad4016/maintainability)](https://codeclimate.com/github/SpecializedGeneralist/hnsw-grpc-server/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/7b5c7fd17aada5ad4016/test_coverage)](https://codeclimate.com/github/SpecializedGeneralist/hnsw-grpc-server/test_coverage)
 
-This is a work-in-progress gRPC server for [hnswlib](https://github.com/nmslib/hnswlib). 
+This is a work-in-progress gRPC server for [hnswlib](https://github.com/nmslib/hnswlib).
 
-It is more than just the core HNSW model, it provides a tool that can be used end-to-end, supporting TLS encryption, multiple persistent indices and batch insertions.
+It is more than just the core HNSW model, it provides a tool that can be used
+end-to-end, supporting TLS encryption, multiple persistent indices and batch
+insertions.
 
-This package includes the relevant sources from the [hnswlib](https://github.com/nmslib/hnswlib), so it doesn't require any external dependencies. For more information, please follow [hnswlib](https://github.com/nmslib/hnswlib) and [Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs](https://arxiv.org/abs/1603.09320).
+This package includes the relevant sources from the [hnswlib](https://github.com/nmslib/hnswlib),
+so it doesn't require any external dependencies. For more information, please
+follow [hnswlib](https://github.com/nmslib/hnswlib) and
+[Efficient and robust approximate nearest neighbor search using Hierarchical
+Navigable Small World graphs](https://arxiv.org/abs/1603.09320).
 
 ## Features
 
