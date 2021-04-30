@@ -264,8 +264,13 @@ func (h *HNSW) Save() error {
 	h.saveIndex(path.Join(h.dir, "index.tmp"))
 
 	// Now that the temporary files are successfully created, replace
-	// the old files (if any) with the new ones.
-	err = os.Rename(path.Join(h.dir, "state.tmp"), path.Join(h.dir, "state"))
+	// the old files (if any) with the new ones. After that, we can
+	// finally empty the write-ahead log.
+	return h.moveTmpFilesAndDeleteLog()
+}
+
+func (h *HNSW) moveTmpFilesAndDeleteLog() error {
+	err := os.Rename(path.Join(h.dir, "state.tmp"), path.Join(h.dir, "state"))
 	if err != nil {
 		return err
 	}
@@ -273,12 +278,10 @@ func (h *HNSW) Save() error {
 	if err != nil {
 		return err
 	}
-
 	err = h.log.Delete()
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
