@@ -23,6 +23,7 @@ import (
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/server"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"
@@ -41,8 +42,10 @@ func TestServer_CreateIndex(t *testing.T) {
 		im := indexmanager.New(dir, zerolog.Nop())
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
-		_, err := srv.CreateIndex(ctx, sampleCreateIndexRequest)
+		resp, err := srv.CreateIndex(ctx, sampleCreateIndexRequest)
 		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+
 		assert.Equal(t, []string{"foo"}, im.IndicesNames())
 	})
 
@@ -51,27 +54,29 @@ func TestServer_CreateIndex(t *testing.T) {
 		im := indexmanager.New(os.TempDir(), zerolog.Nop())
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
-		_, err := srv.CreateIndex(ctx, &grpcapi.CreateIndexRequest{
+		resp, err := srv.CreateIndex(ctx, &grpcapi.CreateIndexRequest{
 			IndexName:      "foo",
 			Dim:            5,
 			EfConstruction: 200,
 			M:              10,
 			MaxElements:    10,
 			Seed:           100,
-			SpaceType:      3,
+			SpaceType:      3, // this is invalid
 			AutoId:         false,
 		})
 		assert.Error(t, err)
+		assert.Nil(t, resp)
+
 		assert.Empty(t, im.IndicesNames())
 	})
 
-	t.Run("creation error", func(t *testing.T) {
+	t.Run("invalid index name", func(t *testing.T) {
 		t.Parallel()
 		im := indexmanager.New(os.TempDir(), zerolog.Nop())
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
-		_, err := srv.CreateIndex(ctx, &grpcapi.CreateIndexRequest{
-			IndexName:      "foo?!", // invalid name
+		resp, err := srv.CreateIndex(ctx, &grpcapi.CreateIndexRequest{
+			IndexName:      "!@#$%^&*()_+", // this is invalid
 			Dim:            5,
 			EfConstruction: 200,
 			M:              10,
@@ -81,6 +86,8 @@ func TestServer_CreateIndex(t *testing.T) {
 			AutoId:         false,
 		})
 		assert.Error(t, err)
+		assert.Nil(t, resp)
+
 		assert.Empty(t, im.IndicesNames())
 	})
 }
@@ -95,12 +102,13 @@ func TestServer_DeleteIndex(t *testing.T) {
 		im := createManagerWithPersistedIndices(t, dir)
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
-		assert.Contains(t, im.IndicesNames(), "test-index-auto-id-1")
+		require.Contains(t, im.IndicesNames(), "test-index-auto-id-1")
 
-		_, err := srv.DeleteIndex(ctx, &grpcapi.DeleteIndexRequest{
+		resp, err := srv.DeleteIndex(ctx, &grpcapi.DeleteIndexRequest{
 			IndexName: "test-index-auto-id-1",
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
 
 		assert.NotContains(t, im.IndicesNames(), "test-index-auto-id-1")
 	})
@@ -112,10 +120,11 @@ func TestServer_DeleteIndex(t *testing.T) {
 		im := indexmanager.New(dir, zerolog.Nop())
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
-		_, err := srv.DeleteIndex(ctx, &grpcapi.DeleteIndexRequest{
-			IndexName: "foo",
+		resp, err := srv.DeleteIndex(ctx, &grpcapi.DeleteIndexRequest{
+			IndexName: "foo", // index should not exist
 		})
 		assert.Error(t, err)
+		assert.Nil(t, resp)
 	})
 }
 
@@ -250,16 +259,14 @@ func TestServer_InsertVectors(t *testing.T) {
 					Vector:    &grpcapi.Vector{Value: sampleVectors[0]},
 				},
 			})
-			err := srv.InsertVectors(stream)
-			assert.NoError(t, err)
+			assert.NoError(t, srv.InsertVectors(stream))
 			assert.NotNil(t, stream.Reply)
 			assert.Equal(t, []string{"3", "4", "3"}, stream.Reply.Ids)
 		}
 		{
 			// Ensure the index was persisted
 			im := indexmanager.New(dir, zerolog.Nop())
-			err := im.LoadIndices()
-			assert.NoError(t, err)
+			assert.NoError(t, im.LoadIndices())
 
 			assertIndexContainsExactlyIDs(t, im, "test-index-auto-id-1", []uint32{1, 2, 3, 4})
 			assertIndexContainsExactlyIDs(t, im, "test-index-auto-id-2", []uint32{1, 2, 3})
@@ -270,7 +277,6 @@ func TestServer_InsertVectors(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
-
 		im := createManagerWithPersistedIndices(t, dir)
 		srv := server.New(sampleServerConfig, im, zerolog.Nop())
 
@@ -280,8 +286,7 @@ func TestServer_InsertVectors(t *testing.T) {
 				Vector:    &grpcapi.Vector{Value: sampleVectors[0]},
 			},
 		})
-		err := srv.InsertVectors(stream)
-		assert.Error(t, err)
+		assert.Error(t, srv.InsertVectors(stream))
 		assert.Nil(t, stream.Reply)
 	})
 
@@ -298,8 +303,7 @@ func TestServer_InsertVectors(t *testing.T) {
 				Vector:    &grpcapi.Vector{Value: sampleVectors[0]},
 			},
 		})
-		err := srv.InsertVectors(stream)
-		assert.Error(t, err)
+		assert.Error(t, srv.InsertVectors(stream))
 		assert.Nil(t, stream.Reply)
 	})
 }
@@ -333,15 +337,13 @@ func TestServer_InsertVectorsWithIds(t *testing.T) {
 					Id:        12,
 				},
 			})
-			err := srv.InsertVectorsWithIds(stream)
-			assert.NoError(t, err)
+			assert.NoError(t, srv.InsertVectorsWithIds(stream))
 			assert.NotNil(t, stream.Reply)
 		}
 		{
 			// Ensure the index was persisted
 			im := indexmanager.New(dir, zerolog.Nop())
-			err := im.LoadIndices()
-			assert.NoError(t, err)
+			assert.NoError(t, im.LoadIndices())
 
 			assertIndexContainsExactlyIDs(t, im, "test-index-custom-id-1", []uint32{1, 2, 10, 11})
 			assertIndexContainsExactlyIDs(t, im, "test-index-custom-id-2", []uint32{1, 2, 12})
@@ -363,8 +365,7 @@ func TestServer_InsertVectorsWithIds(t *testing.T) {
 				Id:        10,
 			},
 		})
-		err := srv.InsertVectorsWithIds(stream)
-		assert.Error(t, err)
+		assert.Error(t, srv.InsertVectorsWithIds(stream))
 		assert.Nil(t, stream.Reply)
 	})
 
@@ -382,8 +383,7 @@ func TestServer_InsertVectorsWithIds(t *testing.T) {
 				Id:        10,
 			},
 		})
-		err := srv.InsertVectorsWithIds(stream)
-		assert.Error(t, err)
+		assert.Error(t, srv.InsertVectorsWithIds(stream))
 		assert.Nil(t, stream.Reply)
 	})
 }
@@ -451,8 +451,7 @@ func TestServer_FlushIndex(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		err = os.Remove(path.Join(dir, "foo", "index"))
-		assert.NoError(t, err)
+		assert.NoError(t, os.Remove(path.Join(dir, "foo", "index")))
 
 		resp, err := srv.FlushIndex(ctx, &grpcapi.FlushRequest{
 			IndexName: "foo",
@@ -599,23 +598,21 @@ func createManagerWithPersistedIndices(t *testing.T, path string) *indexmanager.
 				RandSeed:       100,
 				AutoIDEnabled:  autoID,
 			})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if autoID {
 				for i, vector := range sampleVectors {
 					id, err := index.AddPointAutoID(vector)
-					assert.NoError(t, err)
-					assert.Equal(t, i+1, int(id))
+					require.NoError(t, err)
+					require.Equal(t, i+1, int(id))
 				}
 			} else {
 				for i, vector := range sampleVectors {
-					err = index.AddPoint(vector, uint32(i+1))
-					assert.NoError(t, err)
+					require.NoError(t, index.AddPoint(vector, uint32(i+1)))
 				}
 			}
 
-			err = im.PersistIndex(name)
-			assert.NoError(t, err)
+			require.NoError(t, im.PersistIndex(name))
 		}
 	}
 
@@ -707,12 +704,11 @@ func assertIndexContainsExactlyIDs(t *testing.T, im *indexmanager.IndexManager, 
 func createTempDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "server_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return dir
 }
 
 func deleteDir(t *testing.T, dir string) {
 	t.Helper()
-	err := os.RemoveAll(dir)
-	assert.NoError(t, err)
+	require.NoError(t, os.RemoveAll(dir))
 }
