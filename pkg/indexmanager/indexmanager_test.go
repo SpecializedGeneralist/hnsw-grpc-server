@@ -44,8 +44,7 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		im := indexmanager.New(path.Join(dir, "foo"), zerolog.Nop())
-		err := im.LoadIndices()
-		assert.Error(t, err)
+		assert.Error(t, im.LoadIndices())
 	})
 
 	t.Run("empty directory", func(t *testing.T) {
@@ -54,8 +53,7 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		im := indexmanager.New(dir, zerolog.Nop())
-		err := im.LoadIndices()
-		assert.NoError(t, err)
+		assert.NoError(t, im.LoadIndices())
 		assert.Equal(t, 0, im.Size())
 	})
 
@@ -65,16 +63,13 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		file, err := os.Create(path.Join(dir, "file"))
-		assert.NoError(t, err)
-		err = file.Close()
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
-		err = os.Mkdir(path.Join(dir, ".hidden-dir"), 0777)
-		assert.NoError(t, err)
+		require.NoError(t, os.Mkdir(path.Join(dir, ".hidden-dir"), 0777))
 
 		im := indexmanager.New(dir, zerolog.Nop())
-		err = im.LoadIndices()
-		assert.NoError(t, err)
+		assert.NoError(t, im.LoadIndices())
 		assert.Equal(t, 0, im.Size())
 	})
 
@@ -84,12 +79,10 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		// An empty directory is surely not a valid index
-		err := os.Mkdir(path.Join(dir, "not-an-index"), 0777)
-		assert.NoError(t, err)
+		require.NoError(t, os.Mkdir(path.Join(dir, "not-an-index"), 0777))
 
 		im := indexmanager.New(dir, zerolog.Nop())
-		err = im.LoadIndices()
-		assert.Error(t, err)
+		assert.Error(t, im.LoadIndices())
 	})
 
 	t.Run("existing indices", func(t *testing.T) {
@@ -103,8 +96,7 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 		createAndSaveSampleIndex(t, path.Join(dir, "bar"))
 
 		im := indexmanager.New(dir, zerolog.Nop())
-		err := im.LoadIndices()
-		assert.NoError(t, err)
+		assert.NoError(t, im.LoadIndices())
 		assert.Equal(t, 2, im.Size())
 
 		names := im.IndicesNames()
@@ -129,7 +121,7 @@ func TestIndexManager_LoadIndices(t *testing.T) {
 func TestIndexManager_CreateIndex(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creating valid index", func(t *testing.T) {
+	t.Run("creating valid indices", func(t *testing.T) {
 		t.Parallel()
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
@@ -166,6 +158,7 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 		dir := createTempDir(t)
 		defer deleteDir(t, dir)
 		im := indexmanager.New(dir, zerolog.Nop())
+
 		index, err := im.CreateIndex("foo!?", sampleConfig)
 		assert.Error(t, err)
 		assert.Nil(t, index)
@@ -178,8 +171,8 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 		im := indexmanager.New(dir, zerolog.Nop())
 
 		index, err := im.CreateIndex("foo", sampleConfig)
-		assert.NoError(t, err)
-		assert.NotNil(t, index)
+		require.NoError(t, err)
+		require.NotNil(t, index)
 
 		index, err = im.CreateIndex("foo", sampleConfig)
 		assert.Error(t, err)
@@ -192,8 +185,7 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 		defer deleteDir(t, dir)
 		im := indexmanager.New(dir, zerolog.Nop())
 
-		err := os.Mkdir(path.Join(dir, "foo"), 0777)
-		assert.NoError(t, err)
+		require.NoError(t, os.Mkdir(path.Join(dir, "foo"), 0777))
 
 		index, err := im.CreateIndex("foo", sampleConfig)
 		assert.Error(t, err)
@@ -206,10 +198,10 @@ func TestIndexManager_CreateIndex(t *testing.T) {
 		defer deleteDir(t, dir)
 		im := indexmanager.New(dir, zerolog.Nop())
 
+		// Create a file instead of a dir
 		file, err := os.Create(path.Join(dir, "foo"))
-		assert.NoError(t, err)
-		err = file.Close()
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
 		index, err := im.CreateIndex("foo", sampleConfig)
 		assert.Error(t, err)
@@ -229,25 +221,21 @@ func TestIndexManager_PersistIndex(t *testing.T) {
 			im := indexmanager.New(dir, zerolog.Nop())
 
 			foo, err := im.CreateIndex("foo", sampleConfig)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			_, err = foo.AddPointAutoID(sampleVectors[0])
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			bar, err := im.CreateIndex("bar", sampleConfig)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			_, err = bar.AddPointAutoID(sampleVectors[1])
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
-			err = im.PersistIndex("foo")
-			assert.NoError(t, err)
-
-			err = im.PersistIndex("bar")
-			assert.NoError(t, err)
+			assert.NoError(t, im.PersistIndex("foo"))
+			assert.NoError(t, im.PersistIndex("bar"))
 		}
 		{
 			im := indexmanager.New(dir, zerolog.Nop())
-			err := im.LoadIndices()
-			assert.NoError(t, err)
+			require.NoError(t, im.LoadIndices())
 			assert.Equal(t, 2, im.Size())
 
 			names := im.IndicesNames()
@@ -269,8 +257,7 @@ func TestIndexManager_PersistIndex(t *testing.T) {
 		t.Parallel()
 		im := indexmanager.New(os.TempDir(), zerolog.Nop())
 
-		err := im.PersistIndex("foo")
-		assert.Error(t, err)
+		assert.Error(t, im.PersistIndex("foo"))
 	})
 
 	t.Run("saving error", func(t *testing.T) {
@@ -279,18 +266,16 @@ func TestIndexManager_PersistIndex(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		subDir := path.Join(dir, "sub")
-		err := os.Mkdir(subDir, 0777)
-		assert.NoError(t, err)
+		assert.NoError(t, os.Mkdir(subDir, 0777))
 
 		im := indexmanager.New(subDir, zerolog.Nop())
 
-		_, err = im.CreateIndex("foo", sampleConfig)
-		assert.NoError(t, err)
+		_, err := im.CreateIndex("foo", sampleConfig)
+		require.NoError(t, err)
 
 		deleteDir(t, subDir)
 
-		err = im.PersistIndex("foo")
-		assert.Error(t, err)
+		assert.Error(t, im.PersistIndex("foo"))
 	})
 }
 
@@ -304,20 +289,17 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 		im := indexmanager.New(dir, zerolog.Nop())
 
 		_, err := im.CreateIndex("bar", sampleConfig)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		names := im.IndicesNames()
-		assert.Equal(t, []string{"bar"}, names)
+		require.Equal(t, []string{"bar"}, im.IndicesNames())
 
 		index, found := im.GetIndex("bar")
-		assert.NotNil(t, index)
-		assert.True(t, found)
+		require.NotNil(t, index)
+		require.True(t, found)
 
-		err = im.DeleteIndex("bar")
-		assert.NoError(t, err)
+		assert.NoError(t, im.DeleteIndex("bar"))
 
-		names = im.IndicesNames()
-		assert.Empty(t, names)
+		assert.Empty(t, im.IndicesNames())
 
 		index, found = im.GetIndex("bar")
 		assert.Nil(t, index)
@@ -331,36 +313,34 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 		im := indexmanager.New(dir, zerolog.Nop())
 
 		_, err := im.CreateIndex("foo", sampleConfig)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = im.PersistIndex("foo")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		_, err = im.CreateIndex("bar", sampleConfig)
-		assert.NoError(t, err)
-		err = im.PersistIndex("bar")
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		require.NoError(t, im.PersistIndex("bar"))
 
 		names := im.IndicesNames()
-		assert.Len(t, names, 2)
-		assert.Contains(t, names, "foo")
-		assert.Contains(t, names, "bar")
+		require.Len(t, names, 2)
+		require.Contains(t, names, "foo")
+		require.Contains(t, names, "bar")
 
 		index, found := im.GetIndex("foo")
-		assert.NotNil(t, index)
-		assert.True(t, found)
+		require.NotNil(t, index)
+		require.True(t, found)
 
 		index, found = im.GetIndex("bar")
-		assert.NotNil(t, index)
-		assert.True(t, found)
+		require.NotNil(t, index)
+		require.True(t, found)
 
-		assert.DirExists(t, path.Join(dir, "foo"))
-		assert.DirExists(t, path.Join(dir, "bar"))
+		require.DirExists(t, path.Join(dir, "foo"))
+		require.DirExists(t, path.Join(dir, "bar"))
 
 		err = im.DeleteIndex("foo")
 		assert.NoError(t, err)
 
-		names = im.IndicesNames()
-		assert.Equal(t, []string{"bar"}, names)
+		assert.Equal(t, []string{"bar"}, im.IndicesNames())
 
 		index, found = im.GetIndex("foo")
 		assert.Nil(t, index)
@@ -377,9 +357,7 @@ func TestIndexManager_DeleteIndex(t *testing.T) {
 	t.Run("index does not exist", func(t *testing.T) {
 		t.Parallel()
 		im := indexmanager.New(os.TempDir(), zerolog.Nop())
-
-		err := im.DeleteIndex("foo")
-		assert.Error(t, err)
+		assert.Error(t, im.DeleteIndex("foo"))
 	})
 }
 
@@ -389,30 +367,31 @@ var sampleVectors = [][]float32{
 }
 
 func createAndSaveSampleIndex(t *testing.T, dir string) {
+	t.Helper()
 	hnsw := hnswgo.New(dir, sampleConfig, zerolog.Nop())
 	for _, vector := range sampleVectors {
 		_, err := hnsw.AddPointAutoID(vector)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
-	err := hnsw.Save()
-	assert.NoError(t, err)
+	require.NoError(t, hnsw.Save())
 
-	assert.FileExists(t, path.Join(dir, "state"))
-	assert.FileExists(t, path.Join(dir, "index"))
+	require.FileExists(t, path.Join(dir, "state"))
+	require.FileExists(t, path.Join(dir, "index"))
 }
 
 func createTempDir(t *testing.T) string {
+	t.Helper()
 	dir, err := os.MkdirTemp("", "indexmanager_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return dir
 }
 
 func createDir(t *testing.T, name string) {
-	err := os.Mkdir(name, 0777)
-	require.NoError(t, err)
+	t.Helper()
+	require.NoError(t, os.Mkdir(name, 0777))
 }
 
 func deleteDir(t *testing.T, dir string) {
-	err := os.RemoveAll(dir)
-	assert.NoError(t, err)
+	t.Helper()
+	assert.NoError(t, os.RemoveAll(dir))
 }
