@@ -122,12 +122,12 @@ func New(dir string, config Config, logger zerolog.Logger) *HNSW {
 
 // Load loads an HNSW index from file.
 func Load(dir string, logger zerolog.Logger) (*HNSW, error) {
-	state, err := loadState(dir)
+	state, err := loadState(dir, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	index, err := loadIndex(dir, state.Dim, state.MaxElements, state.SpaceType)
+	index, err := loadIndex(dir, state, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -147,14 +147,14 @@ func Load(dir string, logger zerolog.Logger) (*HNSW, error) {
 	return h, nil
 }
 
-func loadState(dir string) (_ *hnswState, err error) {
+func loadState(dir string, logger zerolog.Logger) (_ *hnswState, err error) {
 	tmpFilename := path.Join(dir, "state.tmp")
 	tmpExists, err := osutils.FileExists(tmpFilename)
 	if err != nil {
 		return nil, err
 	}
 	if tmpExists {
-		return nil, fmt.Errorf("cannot load HNSW state file: %#v found", tmpFilename)
+		logger.Warn().Msg("state.tmp found: the index might not be saved correctly")
 	}
 
 	filename := path.Join(dir, "state")
@@ -176,14 +176,14 @@ func loadState(dir string) (_ *hnswState, err error) {
 	return state, nil
 }
 
-func loadIndex(dir string, dim int, maxElements int, spaceType SpaceType) (C.HNSW, error) {
+func loadIndex(dir string, state *hnswState, logger zerolog.Logger) (C.HNSW, error) {
 	tmpFilename := path.Join(dir, "index.tmp")
 	tmpExists, err := osutils.FileExists(tmpFilename)
 	if err != nil {
 		return nil, err
 	}
 	if tmpExists {
-		return nil, fmt.Errorf("cannot load HNSW index file: %#v found", tmpFilename)
+		logger.Warn().Msg("index.tmp found: the index might not be saved correctly")
 	}
 
 	filename := path.Join(dir, "index")
@@ -199,9 +199,9 @@ func loadIndex(dir string, dim int, maxElements int, spaceType SpaceType) (C.HNS
 	defer C.free(unsafe.Pointer(pFilename))
 	index := C.loadHNSW(
 		pFilename,
-		C.int(dim),
-		C.ulong(maxElements),
-		spaceType.cChar(),
+		C.int(state.Dim),
+		C.ulong(state.MaxElements),
+		state.SpaceType.cChar(),
 	)
 	return index, nil
 }

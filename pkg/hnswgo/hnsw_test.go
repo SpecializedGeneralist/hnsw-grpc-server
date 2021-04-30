@@ -18,6 +18,7 @@ import (
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/hnswgo"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path"
 	"testing"
@@ -290,7 +291,7 @@ func TestHNSW_Save(t *testing.T) {
 	})
 }
 
-func TestHNSW_LoadingErrors(t *testing.T) {
+func TestHNSW_Loading(t *testing.T) {
 	t.Parallel()
 
 	t.Run("state.tmp exists", func(t *testing.T) {
@@ -299,12 +300,11 @@ func TestHNSW_LoadingErrors(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		createAndSaveSampleIndex(t, dir)
-		err := os.Rename(path.Join(dir, "state"), path.Join(dir, "state.tmp"))
-		assert.NoError(t, err)
+		createEmptyFile(t, path.Join(dir, "state.tmp"))
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
-		assert.Nil(t, hnsw)
-		assert.Error(t, err)
+		assert.NotNil(t, hnsw)
+		assert.NoError(t, err)
 	})
 
 	t.Run("state does not exist", func(t *testing.T) {
@@ -327,12 +327,11 @@ func TestHNSW_LoadingErrors(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		createAndSaveSampleIndex(t, dir)
-		err := os.Rename(path.Join(dir, "index"), path.Join(dir, "index.tmp"))
-		assert.NoError(t, err)
+		createEmptyFile(t, path.Join(dir, "index.tmp"))
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
-		assert.Nil(t, hnsw)
-		assert.Error(t, err)
+		assert.NotNil(t, hnsw)
+		assert.NoError(t, err)
 	})
 
 	t.Run("index does not exist", func(t *testing.T) {
@@ -396,4 +395,11 @@ func createTempDir(t *testing.T) string {
 func deleteDir(t *testing.T, dir string) {
 	err := os.RemoveAll(dir)
 	assert.NoError(t, err)
+}
+
+func createEmptyFile(t *testing.T, name string) {
+	file, err := os.Create(name)
+	require.NoError(t, err)
+	err = file.Close()
+	require.NoError(t, err)
 }
