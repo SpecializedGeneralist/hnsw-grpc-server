@@ -389,7 +389,7 @@ var sampleVectors = [][]float32{
 }
 
 func createAndSaveSampleIndex(t *testing.T, dir string) {
-	hnsw := hnswgo.New(dir, sampleConfig)
+	hnsw := hnswgo.New(dir, sampleConfig, zerolog.Nop())
 	for _, vector := range sampleVectors {
 		_, err := hnsw.AddPointAutoID(vector)
 		assert.NoError(t, err)

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/osutils"
 	"github.com/SpecializedGeneralist/hnsw-grpc-server/pkg/wal"
+	"github.com/rs/zerolog"
 	"math"
 	"os"
 	"path"
@@ -51,7 +52,8 @@ type HNSW struct {
 	// AddPointAutoID, since the actual locking of critical parts is
 	// already implemented in the native C++ code.
 	// The only operation which locks for writing is Save.
-	rwMx sync.RWMutex
+	rwMx   sync.RWMutex
+	logger zerolog.Logger
 }
 
 // hnswState provides serializable configuration settings and other
@@ -97,7 +99,7 @@ func (st SpaceType) cChar() C.char {
 }
 
 // New creates a new HNSW index.
-func New(dir string, config Config) *HNSW {
+func New(dir string, config Config, logger zerolog.Logger) *HNSW {
 	return &HNSW{
 		dir: dir,
 		index: C.initHNSW(
@@ -112,13 +114,14 @@ func New(dir string, config Config) *HNSW {
 			Config:     config,
 			LastAutoID: 0,
 		},
-		log:  wal.NewLog(path.Join(dir, "log")),
-		rwMx: sync.RWMutex{},
+		log:    wal.NewLog(path.Join(dir, "log")),
+		rwMx:   sync.RWMutex{},
+		logger: logger,
 	}
 }
 
 // Load loads an HNSW index from file.
-func Load(dir string) (*HNSW, error) {
+func Load(dir string, logger zerolog.Logger) (*HNSW, error) {
 	state, err := loadState(dir)
 	if err != nil {
 		return nil, err
@@ -130,11 +133,12 @@ func Load(dir string) (*HNSW, error) {
 	}
 
 	h := &HNSW{
-		dir:   dir,
-		index: index,
-		state: *state,
-		log:   wal.NewLog(path.Join(dir, "log")),
-		rwMx:  sync.RWMutex{},
+		dir:    dir,
+		index:  index,
+		state:  *state,
+		log:    wal.NewLog(path.Join(dir, "log")),
+		rwMx:   sync.RWMutex{},
+		logger: logger,
 	}
 	err = h.loadLog()
 	if err != nil {

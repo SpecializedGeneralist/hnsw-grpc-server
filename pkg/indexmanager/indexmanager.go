@@ -108,7 +108,7 @@ func (im *IndexManager) CreateIndex(name string, config hnswgo.Config) (*hnswgo.
 		return nil, fmt.Errorf("index dir %#v already exists", dir)
 	}
 
-	index := hnswgo.New(dir, config)
+	index := hnswgo.New(dir, config, im.loggerForIndex(name))
 	im.indices[name] = index
 
 	err = index.Save()
@@ -185,7 +185,7 @@ func (im *IndexManager) loadIndex(name string) error {
 		return fmt.Errorf("index %#v was already loaded", name)
 	}
 
-	h, err := hnswgo.Load(path.Join(im.path, name))
+	h, err := hnswgo.Load(path.Join(im.path, name), im.loggerForIndex(name))
 	if err != nil {
 		return fmt.Errorf("error loading index %#v: %w", name, err)
 	}
@@ -195,4 +195,8 @@ func (im *IndexManager) loadIndex(name string) error {
 
 func isValidIndexName(name string) bool {
 	return len(name) <= 255 && indexNameRegexp.MatchString(name)
+}
+
+func (im *IndexManager) loggerForIndex(name string) zerolog.Logger {
+	return im.logger.With().Str("index", name).Logger()
 }
