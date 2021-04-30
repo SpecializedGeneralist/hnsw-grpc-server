@@ -68,8 +68,7 @@ func TestHNSW_IPSpace(t *testing.T) {
 	hnsw := hnswgo.New(dir, makeConfig(hnswgo.IPSpace, false), zerolog.Nop())
 
 	for i, vector := range sampleVectors {
-		err := hnsw.AddPoint(vector, uint32(i))
-		assert.NoError(t, err)
+		assert.NoError(t, hnsw.AddPoint(vector, uint32(i)))
 	}
 
 	results := hnsw.SearchKNN(sampleVectors[0], 2)
@@ -84,8 +83,7 @@ func TestHNSW_L2Space(t *testing.T) {
 	hnsw := hnswgo.New(dir, makeConfig(hnswgo.L2Space, false), zerolog.Nop())
 
 	for i, vector := range sampleVectors {
-		err := hnsw.AddPoint(vector, uint32(i))
-		assert.NoError(t, err)
+		assert.NoError(t, hnsw.AddPoint(vector, uint32(i)))
 	}
 
 	results := hnsw.SearchKNN(sampleVectors[0], 2)
@@ -100,8 +98,7 @@ func TestHNSW_CosineSpace(t *testing.T) {
 	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false), zerolog.Nop())
 
 	for i, vector := range sampleVectors {
-		err := hnsw.AddPoint(vector, uint32(i))
-		assert.NoError(t, err)
+		assert.NoError(t, hnsw.AddPoint(vector, uint32(i)))
 	}
 
 	results := hnsw.SearchKNN(sampleVectors[0], 2)
@@ -126,10 +123,9 @@ func TestHNSW_AutoIDDisabled(t *testing.T) {
 
 	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false), zerolog.Nop())
 
-	err := hnsw.AddPoint(sampleVectors[0], uint32(42))
-	assert.NoError(t, err)
+	assert.NoError(t, hnsw.AddPoint(sampleVectors[0], uint32(42)))
 
-	_, err = hnsw.AddPointAutoID(sampleVectors[1])
+	_, err := hnsw.AddPointAutoID(sampleVectors[1])
 	assert.Error(t, err)
 
 	results := hnsw.SearchKNN(sampleVectors[0], 1)
@@ -151,8 +147,7 @@ func TestHNSW_AutoIDEnabled(t *testing.T) {
 		assert.Equal(t, i+1, int(id))
 	}
 
-	err := hnsw.AddPoint(sampleVectors[0], uint32(42))
-	assert.Error(t, err)
+	assert.Error(t, hnsw.AddPoint(sampleVectors[0], uint32(42)))
 
 	results := hnsw.SearchKNN(sampleVectors[0], 2)
 	assert.Equal(t, uint32(1), results[0].ID)
@@ -167,15 +162,13 @@ func TestHNSW_MarkDelete(t *testing.T) {
 	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false), zerolog.Nop())
 
 	for i, vector := range sampleVectors {
-		err := hnsw.AddPoint(vector, uint32(i))
-		assert.NoError(t, err)
+		require.NoError(t, hnsw.AddPoint(vector, uint32(i)))
 	}
 
 	results := hnsw.SearchKNN(sampleVectors[0], 1)
-	assert.Equal(t, uint32(0), results[0].ID)
+	require.Equal(t, uint32(0), results[0].ID)
 
-	err := hnsw.MarkDelete(0)
-	assert.NoError(t, err)
+	assert.NoError(t, hnsw.MarkDelete(0))
 
 	results = hnsw.SearchKNN(sampleVectors[0], 1)
 	assert.Equal(t, uint32(1), results[0].ID)
@@ -194,19 +187,17 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false), zerolog.Nop())
 
 			for i, vector := range sampleVectors {
-				err := hnsw.AddPoint(vector, uint32(i))
-				assert.NoError(t, err)
+				require.NoError(t, hnsw.AddPoint(vector, uint32(i)))
 			}
 
 			originalResults = hnsw.SearchKNN(sampleVectors[0], 2)
-			assert.Len(t, originalResults, 2)
+			require.Len(t, originalResults, 2)
 
-			err := hnsw.Save()
-			assert.NoError(t, err)
+			assert.NoError(t, hnsw.Save())
 		}
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		newResults := hnsw.SearchKNN(sampleVectors[0], 2)
 		assert.Equal(t, originalResults, newResults)
@@ -220,24 +211,20 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 		{
 			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true), zerolog.Nop())
 			// Initial save, just for creating the files
-			err := hnsw.Save()
-			assert.NoError(t, err)
+			require.NoError(t, hnsw.Save())
 
-			_, err = hnsw.AddPointAutoID(sampleVectors[0])
-			assert.NoError(t, err)
+			_, err := hnsw.AddPointAutoID(sampleVectors[0])
+			require.NoError(t, err)
 
 			_, err = hnsw.AddPointAutoID(sampleVectors[1])
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
-			err = hnsw.MarkDelete(2)
-			assert.NoError(t, err)
-
-			err = hnsw.SetEf(150)
-			assert.NoError(t, err)
+			require.NoError(t, hnsw.MarkDelete(2))
+			require.NoError(t, hnsw.SetEf(150))
 		}
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		results := hnsw.SearchKNN(sampleVectors[0], 2)
 		assert.Len(t, results, 1)
@@ -252,24 +239,16 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 		{
 			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, false), zerolog.Nop())
 			// Initial save, just for creating the files
-			err := hnsw.Save()
-			assert.NoError(t, err)
+			require.NoError(t, hnsw.Save())
 
-			err = hnsw.AddPoint(sampleVectors[0], 1)
-			assert.NoError(t, err)
-
-			err = hnsw.AddPoint(sampleVectors[1], 2)
-			assert.NoError(t, err)
-
-			err = hnsw.MarkDelete(2)
-			assert.NoError(t, err)
-
-			err = hnsw.SetEf(150)
-			assert.NoError(t, err)
+			require.NoError(t, hnsw.AddPoint(sampleVectors[0], 1))
+			require.NoError(t, hnsw.AddPoint(sampleVectors[1], 2))
+			require.NoError(t, hnsw.MarkDelete(2))
+			require.NoError(t, hnsw.SetEf(150))
 		}
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		results := hnsw.SearchKNN(sampleVectors[0], 2)
 		assert.Len(t, results, 1)
@@ -284,22 +263,20 @@ func TestHNSW_SaveAndLoad(t *testing.T) {
 		{
 			hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true), zerolog.Nop())
 			// Initial save, just for creating the files
-			err := hnsw.Save()
-			assert.NoError(t, err)
+			require.NoError(t, hnsw.Save())
 
-			_, err = hnsw.AddPointAutoID(sampleVectors[0])
-			assert.NoError(t, err)
+			_, err := hnsw.AddPointAutoID(sampleVectors[0])
+			require.NoError(t, err)
 		}
 
 		file, err := os.OpenFile(path.Join(dir, "log"), os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_SYNC, 0666)
 		require.NoError(t, err)
 		_, err = file.Write([]byte("foo!"))
 		require.NoError(t, err)
-		err = file.Close()
-		require.NoError(t, err)
+		require.NoError(t, file.Close())
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		results := hnsw.SearchKNN(sampleVectors[0], 1)
 		assert.Len(t, results, 1)
@@ -316,8 +293,7 @@ func TestHNSW_Save(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		hnsw := hnswgo.New(path.Join(dir, "foo", "bar"), makeConfig(hnswgo.CosineSpace, true), zerolog.Nop())
-		err := hnsw.Save()
-		assert.Error(t, err)
+		assert.Error(t, hnsw.Save())
 	})
 }
 
@@ -343,8 +319,7 @@ func TestHNSW_Loading(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		createAndSaveSampleIndex(t, dir)
-		err := os.Remove(path.Join(dir, "state"))
-		assert.NoError(t, err)
+		require.NoError(t, os.Remove(path.Join(dir, "state")))
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
 		assert.Nil(t, hnsw)
@@ -370,8 +345,7 @@ func TestHNSW_Loading(t *testing.T) {
 		defer deleteDir(t, dir)
 
 		createAndSaveSampleIndex(t, dir)
-		err := os.Remove(path.Join(dir, "index"))
-		assert.NoError(t, err)
+		require.NoError(t, os.Remove(path.Join(dir, "index")))
 
 		hnsw, err := hnswgo.Load(dir, zerolog.Nop())
 		assert.Nil(t, hnsw)
@@ -394,14 +368,13 @@ func createAndSaveSampleIndex(t *testing.T, dir string) {
 	hnsw := hnswgo.New(dir, makeConfig(hnswgo.CosineSpace, true), zerolog.Nop())
 	for i, vector := range sampleVectors {
 		id, err := hnsw.AddPointAutoID(vector)
-		assert.NoError(t, err)
-		assert.Equal(t, i+1, int(id))
+		require.NoError(t, err)
+		require.Equal(t, i+1, int(id))
 	}
-	err := hnsw.Save()
-	assert.NoError(t, err)
+	require.NoError(t, hnsw.Save())
 
-	assert.FileExists(t, path.Join(dir, "state"))
-	assert.FileExists(t, path.Join(dir, "index"))
+	require.FileExists(t, path.Join(dir, "state"))
+	require.FileExists(t, path.Join(dir, "index"))
 }
 
 func makeConfig(spaceType hnswgo.SpaceType, autoIDEnabled bool) hnswgo.Config {
@@ -417,19 +390,20 @@ func makeConfig(spaceType hnswgo.SpaceType, autoIDEnabled bool) hnswgo.Config {
 }
 
 func createTempDir(t *testing.T) string {
+	t.Helper()
 	dir, err := os.MkdirTemp("", "hnsw_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return dir
 }
 
 func deleteDir(t *testing.T, dir string) {
-	err := os.RemoveAll(dir)
-	assert.NoError(t, err)
+	t.Helper()
+	require.NoError(t, os.RemoveAll(dir))
 }
 
 func createEmptyFile(t *testing.T, name string) {
+	t.Helper()
 	file, err := os.Create(name)
 	require.NoError(t, err)
-	err = file.Close()
-	require.NoError(t, err)
+	require.NoError(t, file.Close())
 }
