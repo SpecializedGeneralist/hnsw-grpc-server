@@ -75,7 +75,7 @@ docker run -d \
     --name hnsw-grpc-server \
     -v /path/to/your/data/folder:/hnsw-grpc-server-data
     -p 19530:19530 \
-    specializedgeneralist/hnsw-grpc-server:0.2.0
+    specializedgeneralist/hnsw-grpc-server:1.0.0
 ```
 
 ## Credits
