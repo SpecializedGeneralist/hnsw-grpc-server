@@ -4,15 +4,15 @@
 [![Maintainability](https://api.codeclimate.com/v1/badges/7b5c7fd17aada5ad4016/maintainability)](https://codeclimate.com/github/SpecializedGeneralist/hnsw-grpc-server/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/7b5c7fd17aada5ad4016/test_coverage)](https://codeclimate.com/github/SpecializedGeneralist/hnsw-grpc-server/test_coverage)
 
-This is a work-in-progress gRPC server for [hnswlib](https://github.com/nmslib/hnswlib).
+This is a gRPC server for [hnswlib](https://github.com/nmslib/hnswlib).
 
-It is more than just the core HNSW model, it provides a tool that can be used
+It provides more than just the core HNSW model: it is a tool that can be used
 end-to-end, supporting TLS encryption, multiple persistent indices and batch
 insertions.
 
-This package includes the relevant sources from the [hnswlib](https://github.com/nmslib/hnswlib),
-so it doesn't require any external dependencies. For more information, please
-follow [hnswlib](https://github.com/nmslib/hnswlib) and
+This repository includes the relevant sources from the [hnswlib](https://github.com/nmslib/hnswlib),
+so it doesn't require any external dependency. For more information please
+refer to [hnswlib](https://github.com/nmslib/hnswlib) and
 [Efficient and robust approximate nearest neighbor search using Hierarchical
 Navigable Small World graphs](https://arxiv.org/abs/1603.09320).
 
@@ -24,35 +24,58 @@ A list of API methods now follows:
 | -------------- | --------- |
 | CreateIndex | Make a new index |
 | DeleteIndex | Removes an index |
-| InsertVector | Insert a new vector in the given index |
-| InsertVectors | Insert the new vectors in the given index and flush the index |
+| InsertVector | Insert a new vector in the given index, letting the index generate an ID |
+| InsertVectors | Insert new vectors in the given index, with generated ID, then flush the index |
+| InsertVectorWithId | Insert a new vector with given ID in the given index |
+| InsertVectorsWithId | Insert new vectors with given IDs in the given index, then flush the index |
 | SearchKNN | Return the top k nearest neighbors to the query, searching on the given index |
 | FlushIndex | Serialize the index to file |
 | Indices | Return the list of indices |
 | SetEf | Set the `ef` parameter for the given index |
 
-## Usage
+## Build and run
 
-### Build
+You first need to compile the C++ `hnswlib` wrapper. Just run the following
+script to compile it with `g++`:
+
+```shell
+./pkg/hnswgo/make.sh
+```
+
+Then, download Go dependencies and build the package (with `cgo` enabled):
+
+```shell
+go mod download
+CGO_CXXFLAGS="-std=c++11" CGO_ENABLED=1 go build \
+  -ldflags="-extldflags=-static" \
+  -o hnsw-grpc-server \
+  cmd/main.go
+```
+
+You can finally run the executable. For example, you can get help running:
+
+```shell
+./hnsw-grpc-server -h
+```
+
+## Docker
 
 The [Docker](https://www.docker.com/) image can be built like this:
 
 ```console
-docker build -t hnsw-grpc-server:latest . -f Dockerfile
+docker build -t hnsw-grpc-server:latest .
 ```
 
-### Run
+Pre-built images are available on Docker Hub, at [specializedgeneralist/hnsw-grpc-server](https://hub.docker.com/r/specializedgeneralist/hnsw-grpc-server).
 
-The container can be run like this:
+For example, you can pull the image and run the server like this:
 
-```console
-docker run --network=host --name hnsw-grpc-server -it hnsw-grpc-server:latest --address=0.0.0.0:19530 --debug
-```
-
-It should print:
-
-```console
-2021-04-04T21:55:37Z INF Starting: gRPC Listener [0.0.0.0:19530]
+```shell
+docker run -d \
+    --name hnsw-grpc-server \
+    -v /path/to/your/data/folder:/hnsw-grpc-server-data
+    -p 19530:19530 \
+    specializedgeneralist/hnsw-grpc-server:0.2.0
 ```
 
 ## Credits
