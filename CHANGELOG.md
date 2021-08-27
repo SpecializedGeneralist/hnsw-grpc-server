@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Update `hnswlib` code to release [v0.5.2](https://github.com/nmslib/hnswlib/releases/tag/v0.5.2).
+- Use Go version `1.17`.
+- Upgrade dependencies.
 
 ## [1.0.0] - 2021-05-01
 ### Added
